@@ -1,25 +1,16 @@
-# `re-fund` Website
+# Reown AppKit Example using wagmi (next.js with App Router)
+
+This is a Next.js project.
 
 ## Usage
 
-### Development
+1. Go to [Reown Dashboard](https://dashboard.reown.com) and create a new project.
+2. Copy your `Project ID`
+3. Rename `.env.example` to `.env` and paste your `Project ID` as the value for `NEXT_PUBLIC_PROJECT_ID`
+4. Run `pnpm install` to install dependencies
+5. Run `pnpm run dev` to start the development server
 
-First, run the development server:
+## Resources
 
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-### Deployment
-
-The easiest way to deploy your Next.js app is to use the [Vercel
-Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme)
-from the creators of Next.js.
-
-Check out our [Next.js deployment
-documentation](https://nextjs.org/docs/app/building-your-application/deploying)
-for more details.
+- [Reown — Docs](https://docs.reown.com)
+- [Next.js — Docs](https://nextjs.org/docs)

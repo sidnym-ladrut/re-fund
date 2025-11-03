@@ -31,6 +31,7 @@ npx hardhat ignition deploy ignition/modules/Counter.ts
 To run the deployment to Sepolia:
 
 ```shell
+npx hardhat keystore set SEPOLIA_RPC_URL
 npx hardhat keystore set SEPOLIA_PRIVATE_KEY
 npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
 ```
