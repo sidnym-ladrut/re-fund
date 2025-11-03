@@ -11,7 +11,7 @@
   "license": "GPL-3.0-or-later",
   "type": "module",
   "workspaces": [
-    "packages/hardhat",
-    "packages/nextjs"
+    "packages/chain",
+    "packages/dapp"
   ]
 }

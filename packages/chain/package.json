@@ -1,7 +1,7 @@
 {
-  "name": "@re-fund/hardhat",
+  "name": "@re-fund/chain",
   "version": "0.0.1",
-  "description": "The web3 component (Solidity contracts & testing) of the 're-fund' application.",
+  "description": "The on-chain component (Solidity contracts & testing) of the 're-fund' application.",
   "keywords": [],
   "license": "GPL-3.0-or-later",
   "author": "",
