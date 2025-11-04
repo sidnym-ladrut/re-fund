@@ -4,6 +4,7 @@
   "description": "A simple crowdfunding platform built on Ethereum where *builders* can propose work, *funders* can finance this work, and *oracles* can evaluate and authorize payment for this work.",
   "main": "index.js",
   "scripts": {
+    "postinstall": "patch-package",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,5 +14,8 @@
   "workspaces": [
     "packages/chain",
     "packages/dapp"
-  ]
+  ],
+  "dependencies": {
+    "patch-package": "^8.0.1"
+  }
 }

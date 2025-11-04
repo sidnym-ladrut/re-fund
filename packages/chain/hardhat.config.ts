@@ -1,10 +1,11 @@
 import type { HardhatUserConfig } from "hardhat/config";
 
+import hardhatVerify from "@nomicfoundation/hardhat-verify";
 import hardhatToolboxViemPlugin from "@nomicfoundation/hardhat-toolbox-viem";
 import { configVariable } from "hardhat/config";
 
 const config: HardhatUserConfig = {
-  plugins: [hardhatToolboxViemPlugin],
+  plugins: [hardhatVerify, hardhatToolboxViemPlugin],
   solidity: {
     profiles: {
       default: {
@@ -26,15 +27,16 @@ const config: HardhatUserConfig = {
       type: "edr-simulated",
       chainType: "l1",
     },
-    hardhatOp: {
-      type: "edr-simulated",
-      chainType: "op",
-    },
     sepolia: {
       type: "http",
       chainType: "l1",
       url: configVariable("SEPOLIA_RPC_URL"),
       accounts: [configVariable("SEPOLIA_PRIVATE_KEY")],
+    },
+  },
+  verify: {
+    etherscan: {
+      apiKey: configVariable("ETHERSCAN_API_KEY"),
     },
   },
 };

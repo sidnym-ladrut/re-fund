@@ -13,9 +13,9 @@ npm install
 
 ## Tech Stack
 
-- **Smart Contracts**: HardHatv3
-- **Front-end**: React (via NextJS)
-- **Back-end**: NextJS
+- **Smart Contracts**: [HardHatv3](https://hardhat.org/)
+- **Front-end**: [React](https://react.dev/) (via NextJS) w/ [Reown Appkit](https://docs.reown.com/overview)
+- **Back-end**: [NextJS](https://nextjs.org/docs)
 
 ## Similar Projects
 

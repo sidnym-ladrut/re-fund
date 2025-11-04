@@ -35,3 +35,11 @@ npx hardhat keystore set SEPOLIA_RPC_URL
 npx hardhat keystore set SEPOLIA_PRIVATE_KEY
 npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
 ```
+
+Then, optionally to verify it on Etherscan:
+
+```shell
+npx hardhat keystore set ETHERSCAN_API_KEY
+npx hardhat ignition verify --network sepolia chain-11155111
+npx hardhat ignition deploy --verify --network sepolia ignition/modules/Counter.ts
+```

@@ -1,0 +1,13 @@
+diff --git a/node_modules/@nomicfoundation/hardhat-verify/dist/src/internal/etherscan.js b/node_modules/@nomicfoundation/hardhat-verify/dist/src/internal/etherscan.js
+index 53215a7..7912d21 100644
+--- a/node_modules/@nomicfoundation/hardhat-verify/dist/src/internal/etherscan.js
++++ b/node_modules/@nomicfoundation/hardhat-verify/dist/src/internal/etherscan.js
+@@ -21,7 +21,7 @@ export class Etherscan {
+         this.chainId = String(etherscanConfig.chainId);
+         this.name = etherscanConfig.name ?? "Etherscan";
+         this.url = etherscanConfig.url;
+-        this.apiUrl = etherscanConfig.apiUrl ?? ETHERSCAN_API_URL;
++        this.apiUrl = ETHERSCAN_API_URL;
+         const proxyUrl = shouldUseProxy(this.apiUrl)
+             ? getProxyUrl(this.apiUrl)
+             : undefined;
