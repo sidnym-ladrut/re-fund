@@ -20,11 +20,15 @@ export const Pinata = () => {
   return (
     <div>
       {(files === undefined) ? (
-        <p>Loading...</p>
+        <p>
+          Loading...
+        </p>
       ) : (
         <ul>
-          {(files?.files ?? []).map(({name}) => (
-            <li>{name}</li>
+          {(files?.files ?? []).map(({name, cid}) => (
+            <li key={cid}>
+              {name}
+            </li>
           ))}
         </ul>
       )}
