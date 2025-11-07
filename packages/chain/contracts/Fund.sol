@@ -31,13 +31,21 @@ contract Fund is Ownable, EIP712 {
   ERC20Permit public payoutToken;
   // @notice The IPFS CID of the JSON file with the terms of the work
   bytes32 public termsCID;
+  // @notice The total amount of value withdrawn from this fund
+  uint256 private _withdrawn;
   // @notice The nonce for the next withdrawal
   uint8 private _nonce;
 
-  // @notice A local record of the funds deposited into this contract (by ERC20)
-  mapping(ERC20Permit => uint256) public treasury;
+  // @notice A local record of the funds deposited into this contract (by ERC20, funder)
+  mapping(ERC20Permit => mapping(address => uint256)) private _treasury;
+  // @notice Existence record for ERC20 entries in `_treasury`
   mapping(ERC20Permit => bool) private _treasuryTokenMap;
-  ERC20Permit[] treasuryTokens;
+  // @notice Key list for ERC20 entries in `_treasury`
+  ERC20Permit[] public treasuryTokens;
+  // @notice Existence record for address entries in `_treasury`
+  mapping(address => bool) private _treasuryFunderMap;
+  // @notice Key list for address entries in `_treasury`
+  address[] public treasuryFunders;
   // @notice The oracle's signature on the work terms, which seals the fund
   bytes public termsSignature;
 
@@ -50,7 +58,7 @@ contract Fund is Ownable, EIP712 {
   // @notice Notification for when tokens are withdrawn from the fund
   event Withdrawal(uint256 amount);
   // @notice Notification for when a refund is issued
-  event Refund(address indexed refunder);
+  event Refund(address indexed refunder, uint256 amount);
 
   ///////////////
   // Modifiers //
@@ -125,6 +133,8 @@ contract Fund is Ownable, EIP712 {
       v := byte(0, mload(add(funderSignature, 0x60)))
     }
 
+    // TODO: Almost certainly need to use a passed-in timestamp so that the user doesn't need
+    // to guess the timestamp of the submission block for this operation
     token.permit(funder, address(this), amount, block.timestamp, v, r, s);
     token.transferFrom(funder, address(this), amount);
 
@@ -132,7 +142,11 @@ contract Fund is Ownable, EIP712 {
       treasuryTokens.push(token);
       _treasuryTokenMap[token] = true;
     }
-    treasury[token] += amount;
+    if (!_treasuryFunderMap[funder]) {
+      treasuryFunders.push(funder);
+      _treasuryFunderMap[funder] = true;
+    }
+    _treasury[token][funder] += amount;
 
     emit Deposit(token, funder, amount);
   }
@@ -150,7 +164,7 @@ contract Fund is Ownable, EIP712 {
     uint256 oracleAmount = (amount * oracleCut) / _CUT_MAXIMUM;
     payoutToken.transfer(owner(), amount - oracleAmount);
     payoutToken.transfer(oracle, oracleAmount);
-    treasury[payoutToken] -= amount;
+    _withdrawn += amount;
     _nonce++;
 
     emit Withdrawal(amount);
@@ -158,15 +172,48 @@ contract Fund is Ownable, EIP712 {
 
   // TODO: natspec
   function refund() public onlyManager afterLocked {
-    // TODO: Close out the fund (set a flag in an existing variable)
-    emit Refund(msg.sender);
+    // TODO: Close out the fund (set a flag using an existing variable)
+    // TODO: Any per-token remainder should be sent to the oracle
+    uint256 fundsRegistered_ = fundsRegistered();
+    uint256 fundsRemaining = (fundsRegistered_ - _withdrawn);
+
+    uint256 fundsRefunded = 0;
+    for (uint256 i = 0; i < treasuryTokens.length; i++) {
+      ERC20Permit token = treasuryTokens[i];
+      for (uint256 j = 0; j < treasuryFunders.length; j++) {
+        address funder = treasuryFunders[j];
+
+        uint256 funderTokenSum = _treasury[token][funder];
+        if (funderTokenSum > 0) {
+          uint256 funderTokenRefund = (funderTokenSum * fundsRemaining) / fundsRegistered_;
+          token.transfer(funder, funderTokenRefund);
+          fundsRefunded += funderTokenRefund;
+        }
+      }
+    }
+
+    emit Refund(msg.sender, fundsRefunded);
   }
 
   // TODO: natspec
   function funds() public view returns (uint256 amount) {
-    amount = 0;
+    return fundsAvailable();
+  }
+
+  // TODO: natspec
+  function fundsAvailable() public view returns (uint256 amount) {
     for (uint256 i = 0; i < treasuryTokens.length; i++) {
-      amount += treasury[treasuryTokens[i]];
+      amount += treasuryTokens[i].balanceOf(address(this));
+    }
+    return amount;
+  }
+
+  // TODO: natspec
+  function fundsRegistered() public view returns (uint256 amount) {
+    for (uint256 i = 0; i < treasuryTokens.length; i++) {
+      for (uint256 j = 0; j < treasuryFunders.length; j++) {
+        amount += _treasury[treasuryTokens[i]][treasuryFunders[j]];
+      }
     }
     return amount;
   }
@@ -175,10 +222,9 @@ contract Fund is Ownable, EIP712 {
   // Helper Functions //
   //////////////////////
 
-  function hashWithdraw(uint256 amount) public view returns (bytes32) {
+  function hashWithdraw(uint256 amount) public view returns (bytes32 hash) {
     bytes32 structHash = keccak256(abi.encode(_WITHDRAW_TYPEHASH, amount, _nonce));
-    bytes32 hash = _hashTypedDataV4(structHash);
-    return hash;
+    return _hashTypedDataV4(structHash);
   }
 
   // TODO: natspec

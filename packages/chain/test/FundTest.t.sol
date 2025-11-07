@@ -40,6 +40,7 @@ contract FundTest is Test {
   uint256 constant WORKER_PK = 1;
   uint256 constant ORACLE_PK = 2;
   uint256 constant FUNDER_PK = 3;
+  uint256 constant FUNDER2_PK = 4;
 
   uint256 constant FUND_CUT = 1e3; // 10%
   bytes32 constant FUND_TERMS = bytes32(uint256(100));
@@ -53,6 +54,7 @@ contract FundTest is Test {
   address worker;
   address oracle;
   address funder;
+  address funder2;
 
   //////////////////////
   // Set Up/Tear Down //
@@ -62,6 +64,7 @@ contract FundTest is Test {
     worker = vm.addr(WORKER_PK);
     oracle = vm.addr(ORACLE_PK);
     funder = vm.addr(FUNDER_PK);
+    funder2 = vm.addr(FUNDER2_PK);
 
     vm.prank(funder);
     token = new FundToken();
@@ -78,9 +81,27 @@ contract FundTest is Test {
   }
 
   modifier funded() {
-    bytes32 permitHash = token.hashPermit(funder, address(fund), DEPO_AMOUNT, block.timestamp);
-    bytes memory funderDepositSignature = _signAsRaw(permitHash, FUNDER_PK);
+    bytes memory funderDepositSignature = _signAsRaw(
+      token.hashPermit(funder, address(fund), DEPO_AMOUNT, block.timestamp),
+      FUNDER_PK
+    );
     fund.deposit(token, funder, DEPO_AMOUNT, funderDepositSignature);
+    _;
+  }
+
+  modifier funded2() {
+    vm.prank(funder);
+    token.transfer(funder2, DEPO_AMOUNT);
+    address[2] memory funders = [funder, funder2];
+    uint256[2] memory pks = [FUNDER_PK, FUNDER2_PK];
+    for (uint256 i = 0; i < funders.length; i++) {
+      fund.deposit(
+        token,
+        funders[i],
+        DEPO_AMOUNT,
+        _signAsRaw(token.hashPermit(funders[i], address(fund), DEPO_AMOUNT, block.timestamp), pks[i])
+      );
+    }
     _;
   }
 
@@ -180,6 +201,24 @@ contract FundTest is Test {
     vm.prank(worker);
     vm.expectRevert();
     fund.withdraw(0, oracleZeroWithdrawalSignature);
+  }
+
+  function test_refund_uniDonor() public locked funded {
+    uint256 snapshot = vm.snapshotState();
+    address[2] memory managers = [worker, oracle];
+    for (uint256 i = 0; i < managers.length; i++) {
+      vm.revertToState(snapshot);
+      vm.prank(managers[i]);
+      fund.refund();
+      assertEq(token.balanceOf(funder), TOKEN_SUPPLY);
+    }
+  }
+
+  function test_refund_multiDonor() public locked funded2 {
+    vm.prank(worker);
+    fund.refund();
+    assertEq(token.balanceOf(funder), TOKEN_SUPPLY - DEPO_AMOUNT);
+    assertEq(token.balanceOf(funder2), DEPO_AMOUNT);
   }
 
   //////////////////////
