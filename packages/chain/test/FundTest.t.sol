@@ -3,33 +3,12 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Fund} from "../contracts/Fund.sol";
+import {FundToken, FUND_TOKEN_DECIMALS} from "../contracts/FundToken.sol";
 // import {console} from "forge-std/console.sol";
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-
-string constant TOKEN_NAME = "Fund Token";
-string constant TOKEN_SYMBOL = "$fund";
-uint256 constant TOKEN_DECIMALS = 18;
-uint256 constant TOKEN_COUNT = 1e9;
-uint256 constant TOKEN_SUPPLY = TOKEN_COUNT * 10 ** TOKEN_DECIMALS;
-
-contract FundToken is ERC20, ERC20Permit {
-  bytes32 private constant _PERMIT_TYPEHASH =
-      keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
-
-  constructor() ERC20(TOKEN_NAME, TOKEN_SYMBOL) ERC20Permit(TOKEN_NAME) {
-    _mint(msg.sender, TOKEN_SUPPLY);
-  }
-
-  function hashPermit(address owner, address spender, uint256 value, uint256 deadline)
-      public view returns (bytes32) {
-    bytes32 structHash = keccak256(abi.encode(_PERMIT_TYPEHASH, owner, spender, value, nonces(owner), deadline));
-    bytes32 hash = _hashTypedDataV4(structHash);
-    return hash;
-  }
-}
 
 // solc-ignore-next-line code-size
 contract FundTest is Test {
@@ -43,9 +22,9 @@ contract FundTest is Test {
   uint256 constant FUND_CUT = 1e3; // 10%
   bytes32 constant FUND_TERMS = bytes32(uint256(100));
   bytes32 constant BAD_TERMS = bytes32(uint256(101));
-  uint256 constant FUNDER_BASE_AMOUNT = 1e3 * 10 ** TOKEN_DECIMALS;
-  uint256 constant DEPO_AMOUNT = 1e1 * 10 ** TOKEN_DECIMALS;
-  uint256 constant DEPO_CUT = 1e0 * 10 ** TOKEN_DECIMALS;
+  uint256 constant FUNDER_BASE_AMOUNT = 1e3 * 10 ** FUND_TOKEN_DECIMALS;
+  uint256 constant DEPO_AMOUNT = 1e1 * 10 ** FUND_TOKEN_DECIMALS;
+  uint256 constant DEPO_CUT = 1e0 * 10 ** FUND_TOKEN_DECIMALS;
 
   Fund fund;
   FundToken token;
