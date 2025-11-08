@@ -8,75 +8,80 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
+/// @title Fund
+/// @notice A treasury contract that manages payouts to a worker (the owner) with the approval of an oracle (the assessor) with ERC20 donations from funders (any donor)
+/// @author ~sidnym-ladrut -- DM on Urbit for more details
 contract Fund is Ownable, EIP712 {
   ////////////////////////
   // Constant Variables //
   ////////////////////////
 
+  /// @notice EIP712 type hash for the `Withdraw` action
   bytes32 private constant _WITHDRAW_TYPEHASH = keccak256("Withdraw(uint256 amount,uint256 nonce)");
+  /// @notice The maximum permissible cut value (i.e. 2-digits 100%)
   uint256 private constant _CUT_MAXIMUM = 1e4;
 
   /////////////////////
   // State Variables //
   /////////////////////
 
-  // @notice The account performing the work to be compensated
-  // address public worker;
-  // @notice The account responsible for reviewing the work and authorizing payouts
+  /// @notice The account responsible for reviewing the work and authorizing payouts
   address public oracle;
-  // @notice The 2-digits cut amount provisioned for the oracle on payout
+  /// @notice The 2-digits cut amount provisioned for the oracle on payout
   uint256 public oracleCut;
 
-  // @notice The address of the ERC20 that will be used to comensate the worker
+  /// @notice The address of the ERC20 that will be used to comensate the worker
+  /// @dev The ERC20 type is constrained to ERC20Permit to enable 1-transaction, gas-efficient deposits
+  /// @dev See https://eips.ethereum.org/EIPS/eip-2612#abstract
   ERC20Permit public payoutToken;
-  // @notice The IPFS CID of the JSON file with the terms of the work
+  /// @notice The IPFS CID of the JSON file with the terms of the work
   bytes32 public termsCID;
-  // @notice The total amount of value withdrawn from this fund
+  /// @notice The total amount of value withdrawn from this fund
   uint256 private _withdrawn;
-  // @notice The nonce for the next withdrawal
+  /// @notice The nonce for the next withdrawal
   uint8 private _nonce;
 
-  // @notice A local record of the funds deposited into this contract (by ERC20, funder)
+  /// @notice A local record of the funds deposited into this contract (by ERC20, funder)
   mapping(ERC20Permit => mapping(address => uint256)) private _treasury;
-  // @notice Existence record for ERC20 entries in `_treasury`
+  /// @notice Existence record for ERC20 entries in `_treasury`
   mapping(ERC20Permit => bool) private _treasuryTokenMap;
-  // @notice Key list for ERC20 entries in `_treasury`
+  /// @notice Key list for ERC20 entries in `_treasury`
   ERC20Permit[] public treasuryTokens;
-  // @notice Existence record for address entries in `_treasury`
+  /// @notice Existence record for address entries in `_treasury`
   mapping(address => bool) private _treasuryFunderMap;
-  // @notice Key list for address entries in `_treasury`
+  /// @notice Key list for address entries in `_treasury`
   address[] public treasuryFunders;
-  // @notice The oracle's signature on the work terms, which seals the fund
+  /// @notice The oracle's signature on the work terms, which seals the fund
   bytes public termsSignature;
 
   ////////////
   // Events //
   ////////////
 
-  // @notice Notification for when tokens are deposited into the fund
+  /// @notice Notification for when tokens are deposited into the fund
   event Deposit(ERC20Permit indexed token, address indexed from, uint256 amount);
-  // @notice Notification for when tokens are withdrawn from the fund
+  /// @notice Notification for when tokens are withdrawn from the fund
   event Withdrawal(uint256 amount);
-  // @notice Notification for when a refund is issued
+  /// @notice Notification for when a refund is issued
   event Refund(address indexed refunder, uint256 amount);
 
   ///////////////
   // Modifiers //
   ///////////////
 
-  // TODO: natspec
+  /// @notice Constrains the caller to the contract's worker (owner) or oracle
   modifier onlyManager() {
     require(msg.sender == owner() || msg.sender == oracle, "Not a fund manager (i.e. worker or oracle)");
     _;
   }
 
-  // TODO: natspec
+  /// @notice Constrains the call time to before {lockTerms} is called
   modifier beforeLocked() {
     require(termsSignature.length == 0, "Fund terms are locked");
     _;
   }
 
-  // TODO: natspec
+  /// @notice Constrains the call time to after {lockTerms} is called
   modifier afterLocked() {
     require(termsSignature.length == 65, "Fund terms are not yet locked");
     _;
@@ -86,27 +91,35 @@ contract Fund is Ownable, EIP712 {
   // Functions //
   ///////////////
 
-  // TODO: natspec
+  /// @notice Creates a fund with an initial set of terms
+  /// @dev This function is a thin wrapper for {updateTerms}
   constructor(address oracle_, uint256 cut, ERC20Permit token, bytes32 terms)
       Ownable(msg.sender) EIP712("Fund", "1") {
     updateTerms(oracle_, cut, token, terms);
   }
 
-  // TODO: natspec
+  /// @notice The worker performing the tasks outlined in the terms for this fund
+  /// @dev This value is always the same as the contract owner
   function worker() external view returns (address) {
     return owner();
   }
 
-  // TODO: natspec
+  /// @notice Modifies the set of terms for this fund contract
+  /// @param oracle_ The address of the account that will assess and sign off on the work for this fund
+  /// @param cut The percentage compensation allotted to the oracle on withdrawal as a 2-digits integer value
+  /// @param token The address of the ERC20Permit token that will be paid out to the worker
+  /// @param terms The IPFS CID of the JSON blob defining the scope of work for this fund
   function updateTerms(address oracle_, uint256 cut, ERC20Permit token, bytes32 terms)
       public beforeLocked {
+    require(cut <= _CUT_MAXIMUM, "Oracle cut must be a 2-digit percentage (0 <= cut <= 1e4)");
     oracle = oracle_;
     oracleCut = cut;
     payoutToken = token;
     termsCID = terms;
   }
 
-  // TODO: natspec
+  /// @notice Finalizes the contract terms with a signature from the oracle (i.e. assessor)
+  /// @param oracleSignature An EIP-191 signed message of the {termsCID} from the oracle
   function lockTerms(bytes memory oracleSignature) public onlyOwner beforeLocked {
     (address signer, ECDSA.RecoverError error, ) = ECDSA.tryRecover(
       MessageHashUtils.toEthSignedMessageHash(termsCID),
@@ -117,13 +130,18 @@ contract Fund is Ownable, EIP712 {
     termsSignature = oracleSignature;
   }
 
-  // TODO: natspec
+  /// @notice Deposits a specified amount of a given token from some funder into this fund
+  /// @dev Performing token transfers within this contract allows them to be tracked for refunds, unlike ERC20.transfer calls
+  /// @dev For details on 'Permit' signature construction, see: https://eips.ethereum.org/EIPS/eip-2612#specification
+  /// @param token The ERC20 token to be deposited
+  /// @param funder The address of the account that will be depositing
+  /// @param amount The amount of the given token that will deposited
+  /// @param funderSignature An ERC20Permit signature from {funder} authorizing {amount} of {token} to be transferred
   function deposit(ERC20Permit token, address funder, uint256 amount, bytes memory funderSignature)
       public afterLocked {
     // TODO: Remove
     require(token == payoutToken, "Only deposits in the contract's payout token are currently accepted");
 
-    // TODO: Refactor into standalone function (?)
     bytes32 r;
     bytes32 s;
     uint8 v;
@@ -151,7 +169,10 @@ contract Fund is Ownable, EIP712 {
     emit Deposit(token, funder, amount);
   }
 
-  // TODO: natspec
+  /// @notice Withdraws an oracle-approved amount of {payoutToken} to {worker}
+  /// @dev The {hashWithdraw} function can be used to generate the EIP-712 signature payload for the current nonce
+  /// @param amount The amount of {payoutToken} that will be withdrawn
+  /// @param oracleSignature An EIP-712 signature from the {oracle} authorizing an {amount} transfer to {worker}
   function withdraw(uint256 amount, bytes memory oracleSignature)
       public onlyOwner afterLocked {
     require(amount > 0, "Must withdraw a non-zero sum");
@@ -161,6 +182,8 @@ contract Fund is Ownable, EIP712 {
     require(error == ECDSA.RecoverError.NoError, "Malformed signature provided");
     require(signer == oracle, "Invalid signer provided (must be the contract oracle)");
 
+    // NOTE: This method does not incrementally update `_treasury` to save gas. This makes `withdraw`s cheaper
+    // (the more common path) than `refund`s (the 'last resort escape hatch' path)
     uint256 oracleAmount = (amount * oracleCut) / _CUT_MAXIMUM;
     payoutToken.transfer(owner(), amount - oracleAmount);
     payoutToken.transfer(oracle, oracleAmount);
@@ -170,7 +193,8 @@ contract Fund is Ownable, EIP712 {
     emit Withdrawal(amount);
   }
 
-  // TODO: natspec
+  /// @notice Refunds all unclaimed tokens in this fund to their respective funders
+  /// @dev Refunds are proportional to (1) the funder's funding amount and (2) the remaining funds in this contract
   function refund() public onlyManager afterLocked {
     // TODO: Close out the fund (set a flag using an existing variable)
     // TODO: Any per-token remainder should be sent to the oracle
@@ -195,12 +219,14 @@ contract Fund is Ownable, EIP712 {
     emit Refund(msg.sender, fundsRefunded);
   }
 
-  // TODO: natspec
+  /// @notice Alias for {fundsAvailable}
   function funds() public view returns (uint256 amount) {
     return fundsAvailable();
   }
 
-  // TODO: natspec
+  /// @notice The sum of all contributions (registered & unregistered) to this fund expressed in the payout currency
+  /// @dev Registered: Funds contributed via {deposit} with known donors and quantities
+  /// @dev Unregistered: Funds contributed outside of this contract with untracked donors
   function fundsAvailable() public view returns (uint256 amount) {
     for (uint256 i = 0; i < treasuryTokens.length; i++) {
       amount += treasuryTokens[i].balanceOf(address(this));
@@ -208,7 +234,9 @@ contract Fund is Ownable, EIP712 {
     return amount;
   }
 
-  // TODO: natspec
+  /// @notice The sum of all registered contributions to this fund expressed in the payout currency
+  /// @dev Registered: Funds contributed via {deposit} with known donors and quantities
+  /// @dev Unregistered: Funds contributed outside of this contract with untracked donors
   function fundsRegistered() public view returns (uint256 amount) {
     for (uint256 i = 0; i < treasuryTokens.length; i++) {
       for (uint256 j = 0; j < treasuryFunders.length; j++) {
@@ -222,12 +250,17 @@ contract Fund is Ownable, EIP712 {
   // Helper Functions //
   //////////////////////
 
+  /// @notice Generates an EIP-712 'Withdraw' signature payload for the given amount at current withdrawal nonce
+  /// @dev For details on 'Withdraw' signature construction, see: https://eips.ethereum.org/EIPS/eip-712#definition-of-domainseparator
+  /// @param amount The amount of {payoutToken} that will be withdrawn
+  /// @return hash The EIP-712 'Withdraw' payload that can be signed by the {oracle} to authorize a withdrawal
   function hashWithdraw(uint256 amount) public view returns (bytes32 hash) {
     bytes32 structHash = keccak256(abi.encode(_WITHDRAW_TYPEHASH, amount, _nonce));
     return _hashTypedDataV4(structHash);
   }
 
-  // TODO: natspec
+  /// @inheritdoc Ownable
+  /// @dev This override prevents the fund contract from being transferred to another owner
   function _transferOwnership(address newOwner) internal override {
     if (newOwner != msg.sender) {
       revert Ownable.OwnableInvalidOwner(newOwner);

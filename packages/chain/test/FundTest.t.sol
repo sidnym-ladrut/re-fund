@@ -15,7 +15,6 @@ uint256 constant TOKEN_DECIMALS = 18;
 uint256 constant TOKEN_COUNT = 1e9;
 uint256 constant TOKEN_SUPPLY = TOKEN_COUNT * 10 ** TOKEN_DECIMALS;
 
-// solc-ignore-next-line code-size
 contract FundToken is ERC20, ERC20Permit {
   bytes32 private constant _PERMIT_TYPEHASH =
       keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
@@ -32,6 +31,7 @@ contract FundToken is ERC20, ERC20Permit {
   }
 }
 
+// solc-ignore-next-line code-size
 contract FundTest is Test {
   uint256 constant LAUNCHER_PK = 1;
   uint256 constant WORKER_PK = 2;
@@ -84,18 +84,17 @@ contract FundTest is Test {
   }
 
   modifier funded() {
-    (address funder, uint256 funderPK) = _funder();
-    bytes memory fsign = _signAsRaw(token.hashPermit(funder, address(fund), DEPO_AMOUNT, block.timestamp), funderPK);
-    fund.deposit(token, funder, DEPO_AMOUNT, fsign);
+    _fundAs(0, DEPO_AMOUNT);
     _;
   }
 
   modifier funded2() {
-    for (uint256 i = 0; i < 2; i++) {
-      (address funder, uint256 funderPK) = _funder(i);
-      bytes memory fsign = _signAsRaw(token.hashPermit(funder, address(fund), DEPO_AMOUNT, block.timestamp), funderPK);
-      fund.deposit(token, funder, DEPO_AMOUNT, fsign);
-    }
+    for (uint256 i = 0; i < 2; i++) { _fundAs(i, DEPO_AMOUNT); }
+    _;
+  }
+
+  modifier fundedN() {
+    for (uint256 i = 0; i < FUNDER_COUNT; i++) { _fundAs(i, i*DEPO_AMOUNT); }
     _;
   }
 
@@ -206,15 +205,21 @@ contract FundTest is Test {
     for (uint256 i = 0; i < managers.length; i++) {
       vm.revertToState(snapshot);
       vm.prank(managers[i]);
+      vm.expectEmit();
+      emit Fund.Refund(managers[i], DEPO_AMOUNT);
       fund.refund();
+
       assertEq(token.balanceOf(address(fund)), 0);
       assertEq(token.balanceOf(funder), FUNDER_BASE_AMOUNT);
     }
   }
 
-  function test_refund_multiDonor() public locked funded2 {
+  function test_refund_multiDonor_basic() public locked funded2 {
     vm.prank(worker);
+    vm.expectEmit();
+    emit Fund.Refund(worker, 2 * DEPO_AMOUNT);
     fund.refund();
+
     assertEq(token.balanceOf(address(fund)), 0);
     for (uint256 i = 0; i < 2; i++) {
       (address funder, ) = _funder(i);
@@ -222,15 +227,37 @@ contract FundTest is Test {
     }
   }
 
+  function test_refund_multiDonor_complex() public locked funded2 {
+    _fundAs(1, DEPO_AMOUNT);
+
+    uint256 withdrawAmount = fund.funds() / 2;
+    bytes memory oracleWithdrawalSignature = _signAsRaw(fund.hashWithdraw(withdrawAmount), ORACLE_PK);
+    vm.prank(worker);
+    fund.withdraw(withdrawAmount, oracleWithdrawalSignature);
+    vm.prank(worker);
+    fund.refund();
+
+    for (uint256 i = 0; i < 2; i++) {
+      (address funder, ) = _funder(i);
+      assertEq(token.balanceOf(funder), FUNDER_BASE_AMOUNT - ((DEPO_AMOUNT * (i + 1)) / 2));
+    }
+  }
+
   //////////////////////
   // Helper Functions //
   //////////////////////
+
+  function _fundAs(uint256 index, uint256 amount) internal {
+    (address funder, uint256 funderPK) = _funder(index);
+    bytes memory signature = _signAsRaw(token.hashPermit(funder, address(fund), amount, block.timestamp), funderPK);
+    fund.deposit(token, funder, amount, signature);
+  }
 
   function _funder() internal view returns (address funder, uint256 funderPK) {
     return _funder(0);
   }
 
-  function _funder(uint256 index)  internal view returns (address funder, uint256 funderPK) {
+  function _funder(uint256 index) internal view returns (address funder, uint256 funderPK) {
     return (funders[index], FUNDER_BASE_PK + index);
   }
 
