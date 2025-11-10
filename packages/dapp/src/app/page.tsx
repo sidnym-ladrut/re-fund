@@ -1,9 +1,9 @@
 // import { cookieStorage, createStorage, http } from '@wagmi/core'
 import Link from 'next/link'
-import { ConnectButton } from "@/components/ConnectButton";
-import { InfoList } from "@/components/InfoList";
-import { ActionButtonList } from "@/components/ActionButtonList";
-import { SignMessageModule } from "@/components/SignMessageModule";
+import { ConnectButton } from "@/comp/ConnectButton";
+import { InfoList } from "@/comp/InfoList";
+import { ActionButtonList } from "@/comp/ActionButtonList";
+import { SignMessageModule } from "@/comp/SignMessageModule";
 
 export default function Home() {
   return (

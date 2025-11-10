@@ -6,10 +6,10 @@ import { formatUnits } from 'viem'
 
 import type { Provider } from "@reown/appkit/react";
 import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
-import { Address } from "@/components/Address";
-import { ConnectButton } from "@/components/ConnectButton";
+import { Address } from "@/comp/Address";
+import { ConnectButton } from "@/comp/ConnectButton";
 import { formatNumber } from "@/lib/util";
-import { wagmiConfig } from "@/config";
+import { APPKIT_WAGMI } from "@/cfg";
 
 import Contracts from '@/../chain/contracts'
 
@@ -51,19 +51,19 @@ export default function FundPage({
   useEffect(() => {
     if (isConnected) {
       Promise.all([
-        readContract(wagmiConfig, {
+        readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundAddress,
           abi: ChainContracts.Fund.abi,
           functionName: 'worker',
           args: [],
         }),
-        readContract(wagmiConfig, {
+        readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundAddress,
           abi: ChainContracts.Fund.abi,
           functionName: 'oracle',
           args: [],
         }),
-        readContract(wagmiConfig, {
+        readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundAddress,
           abi: ChainContracts.Fund.abi,
           functionName: 'payoutToken',
@@ -80,25 +80,25 @@ export default function FundPage({
   useEffect(() => {
     if (isConnected && !!fundData) {
       Promise.all([
-        readContract(wagmiConfig, {
+        readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundData.token,
           abi: ChainContracts.FundToken.abi,
           functionName: 'name',
           args: [],
         }),
-        readContract(wagmiConfig, {
+        readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundData.token,
           abi: ChainContracts.FundToken.abi,
           functionName: 'symbol',
           args: [],
         }),
-        readContract(wagmiConfig, {
+        readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundData.token,
           abi: ChainContracts.FundToken.abi,
           functionName: 'balanceOf',
           args: [fundAddress],
         }),
-        readContract(wagmiConfig, {
+        readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundData.token,
           abi: ChainContracts.FundToken.abi,
           functionName: 'decimals',

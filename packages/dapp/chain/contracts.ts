@@ -1,4 +1,4 @@
-const contracts = {31337:{
+const CONTRACTS = {31337:{
   "Fund": {
     "address": "0xf5059a5D33d5853360D16C683c16e67980206f36",
     "abi": [
@@ -1059,4 +1059,4 @@ const contracts = {31337:{
     "inheritedFunctions": {}
   }
 },} as const;
-export default contracts;
+export default CONTRACTS;

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { headers } from 'next/headers' // added
 import './globals.css';
-import ContextProvider from '@/context'
+import ContextProvider from '@/comp/ContextProvider'
 
 export const metadata: Metadata = {
   title: "re-fund",

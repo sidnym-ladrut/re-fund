@@ -2,7 +2,6 @@
 
 import { useAppKitAccount } from '@reown/appkit/react'
 import { useSignMessage } from 'wagmi'
-import { networks } from '@/config'
 
 export const SignMessageModule = () => {
   const { signMessageAsync } = useSignMessage();

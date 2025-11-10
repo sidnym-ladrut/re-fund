@@ -112,7 +112,7 @@ export default async function syncAbis() {
   }
   fs.writeFileSync(
     `${TARGET_DIR}contracts.ts`,
-    `const contracts = {${fileContent}} as const;\nexport default contracts;`,
+    `const CONTRACTS = {${fileContent}} as const;\nexport default CONTRACTS;`,
   );
 
   console.log(`📝 Updated TypeScript contract definition file: ${TARGET_DIR}contracts.ts`);

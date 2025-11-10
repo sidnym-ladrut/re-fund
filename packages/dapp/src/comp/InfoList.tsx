@@ -6,9 +6,9 @@ import {
   useAppKitTheme,
   useAppKitEvents,
   useAppKitAccount,
-  useWalletInfo
+  useWalletInfo,
 } from '@reown/appkit/react'
-import { useClientMounted } from "@/hooks/useClientMount";
+import { useClientMounted } from "@/hook/useClientMount";
 
 export const InfoList = () => {
   const kitTheme = useAppKitTheme();
