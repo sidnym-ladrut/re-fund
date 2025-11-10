@@ -2,10 +2,13 @@
 import { use, useState, useEffect } from 'react'
 import { notFound } from 'next/navigation'
 import { readContract } from '@wagmi/core'
+import { formatUnits } from 'viem'
 
 import type { Provider } from "@reown/appkit/react";
 import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
+import { Address } from "@/components/Address";
 import { ConnectButton } from "@/components/ConnectButton";
+import { formatNumber } from "@/lib/util";
 import { wagmiConfig } from "@/config";
 
 import Fund from "@/abi/Fund" with { type: 'json' };
@@ -14,16 +17,20 @@ import FundToken from "@/abi/FundToken" with { type: 'json' };
 interface FundData {
   worker: `0x${string}`;
   oracle: `0x${string}`;
+  token: `0x${string}`;
+}
+
+interface TokenData {
+  name: string;
+  symbol: string;
+  supply: bigint;
+  decimals: bigint;
 }
 
 function assertValidAddress(value: string): asserts value is `0x${string}` {
   if (!/^0x[a-fA-F0-9]{40}$/.test(value)) {
     notFound();
   }
-}
-
-function formatAddress(address: `0x${string}`): `0x${string}` {
-  return `${address.slice(0, 5)}…${address.slice(-4)}`;
 }
 
 export default function FundPage({
@@ -36,6 +43,7 @@ export default function FundPage({
 
   const { address: walletAddress, isConnected } = useAppKitAccount();
   const [fundData, setFundData] = useState<FundData | undefined>(undefined);
+  const [tokenData, setTokenData] = useState<TokenData | undefined>(undefined);
 
   useEffect(() => {
     if (isConnected) {
@@ -52,30 +60,88 @@ export default function FundPage({
           functionName: 'oracle',
           args: [],
         }),
-      ]).then(([worker, oracle]) => {
-        setFundData({worker, oracle});
+        readContract(wagmiConfig, {
+          address: fundAddress,
+          abi: Fund.abi,
+          functionName: 'payoutToken',
+          args: [],
+        }),
+      ]).then(([worker, oracle, token]) => {
+        setFundData({worker, oracle, token});
       }).catch((error) => {
         console.log(error);
       });
     }
   }, [fundAddress, isConnected]);
 
+  useEffect(() => {
+    if (isConnected && !!fundData) {
+      Promise.all([
+        readContract(wagmiConfig, {
+          address: fundData.token,
+          abi: FundToken.abi,
+          functionName: 'name',
+          args: [],
+        }),
+        readContract(wagmiConfig, {
+          address: fundData.token,
+          abi: FundToken.abi,
+          functionName: 'symbol',
+          args: [],
+        }),
+        readContract(wagmiConfig, {
+          address: fundData.token,
+          abi: FundToken.abi,
+          functionName: 'totalSupply',
+          args: [],
+        }),
+        readContract(wagmiConfig, {
+          address: fundData.token,
+          abi: FundToken.abi,
+          functionName: 'decimals',
+          args: [],
+        }),
+      ]).then(([name, symbol, supply, decimals]) => {
+        setTokenData({name, symbol, supply, decimals});
+      }).catch((error) => {
+        console.log(error);
+      });
+    }
+  }, [fundData]);
+
   return (
     <div className="flex flex-col gap-y-4">
-      <h1>Fund @ {formatAddress(fundAddress)}</h1>
+      <h1>Fund @ <Address address={fundAddress} /></h1>
       <ConnectButton />
       <div>
         {(fundData === undefined) ? (
-          <p>
-            Loading...
-          </p>
+          <span>Loading...</span>
         ) : (
           <ul>
             <li>
-              Worker: {formatAddress(fundData.worker)}
+              <strong>Worker:</strong> <Address address={fundData.worker} />
             </li>
             <li>
-              Oracle: {formatAddress(fundData.oracle)}
+              <strong>Oracle:</strong> <Address address={fundData.oracle} />
+            </li>
+            <li>
+              <strong>Token:</strong> <Address address={fundData.token} />
+              {(tokenData === undefined) ? (
+                <span>Loading...</span>
+              ) : (
+                <ul>
+                  <li>
+                    <strong>Name:</strong> {tokenData.name}
+                  </li>
+                  <li>
+                    <strong>Symbol:</strong> {tokenData.symbol}
+                  </li>
+                  <li>
+                    <strong>Supply:</strong>
+                    {formatNumber(formatUnits(tokenData.supply, tokenData.decimals))}
+                  </li>
+                </ul>
+              )}
             </li>
           </ul>
         )}

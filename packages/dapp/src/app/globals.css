@@ -1,18 +1,31 @@
 @import "tailwindcss";
 
 h1 {
-  @apply font-bold hyphens-auto text-3xl sm:text-4xl;
+    @apply font-bold hyphens-auto text-3xl sm:text-4xl;
 }
 h2 {
-  @apply font-medium hyphens-auto text-2xl sm:text-3xl;
+    @apply font-medium hyphens-auto text-2xl sm:text-3xl;
 }
 h3 {
-  @apply font-medium text-gray-500 text-lg sm:text-xl;
+    @apply font-medium text-gray-500 text-lg sm:text-xl;
 }
 h4 {
-  @apply text-gray-500 text-base sm:text-lg;
+    @apply text-gray-500 text-base sm:text-lg;
 }
 
 ul {
-  @apply list-disc list-inside;
+    @apply list-disc list-inside;
+}
+ul ul {
+  @apply ml-5;
+}
+
+button {
+    @apply px-3 py-2 bg-white text-black border-2 border-black rounded-md transition-all duration-300 ease-in-out;
+    &:active {
+        @apply bg-gray-500 text-white;
+    }
+    &:hover {
+        @apply cursor-pointer bg-black text-white;
+    }
 }

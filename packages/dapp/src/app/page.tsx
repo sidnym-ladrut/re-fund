@@ -3,14 +3,12 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { InfoList } from "@/components/InfoList";
 import { ActionButtonList } from "@/components/ActionButtonList";
 import { SignMessageModule } from "@/components/SignMessageModule";
-import { Pinata } from "@/components/Pinata";
 
 export default function Home() {
   return (
-    <div className="pages">
+    <div className="flex flex-col gap-y-4">
       <h1>re-fund</h1>
       <ConnectButton />
-      <Pinata />
       <ActionButtonList />
       <SignMessageModule />
       <InfoList />
