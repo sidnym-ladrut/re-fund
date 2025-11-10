@@ -16,11 +16,14 @@
   "dependencies": {
     "@reown/appkit": "1.8.12",
     "@reown/appkit-adapter-wagmi": "1.8.12",
+    "@tailwindcss/postcss": "^4.1.17",
     "@tanstack/react-query": "^5.59.20",
     "next": "15.3.3",
     "pinata": "^2.5.1",
+    "postcss": "^8.4.31",
     "react": "19.0.0",
     "react-dom": "19.0.0",
+    "tailwindcss": "^4.1.17",
     "viem": "^2.31.3",
     "wagmi": "^2.12.31"
   },

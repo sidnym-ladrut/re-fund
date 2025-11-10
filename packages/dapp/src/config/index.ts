@@ -1,5 +1,5 @@
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { mainnet, sepolia } from '@reown/appkit/networks'
+import { mainnet, sepolia, hardhat } from '@reown/appkit/networks'
 import type { AppKitNetwork } from '@reown/appkit/networks'
 import { PinataSDK } from 'pinata'
 
@@ -13,7 +13,7 @@ if (!projectId) {
   throw new Error('Project ID is not defined')
 }
 
-export const networks = [mainnet, sepolia] as [AppKitNetwork, ...AppKitNetwork[]]
+export const networks = [mainnet, sepolia, hardhat] as [AppKitNetwork, ...AppKitNetwork[]]
 export const wagmiAdapter = new WagmiAdapter({
   ssr: true,
   projectId,
