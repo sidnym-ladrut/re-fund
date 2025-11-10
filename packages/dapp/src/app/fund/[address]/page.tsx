@@ -1,5 +1,5 @@
 'use client'
-import { use, useState, useEffect } from 'react'
+import { use, useState, useEffect, useMemo } from 'react'
 import { notFound } from 'next/navigation'
 import { readContract } from '@wagmi/core'
 import { formatUnits } from 'viem'
@@ -11,8 +11,7 @@ import { ConnectButton } from "@/components/ConnectButton";
 import { formatNumber } from "@/lib/util";
 import { wagmiConfig } from "@/config";
 
-import Fund from "@/abi/Fund" with { type: 'json' };
-import FundToken from "@/abi/FundToken" with { type: 'json' };
+import Contracts from '@/../chain/contracts'
 
 interface FundData {
   worker: `0x${string}`;
@@ -41,28 +40,32 @@ export default function FundPage({
   const { address: fundAddress } = use(params);
   assertValidAddress(fundAddress);
 
-  const { address: walletAddress, isConnected } = useAppKitAccount();
+  const { address: walletAddress, isConnected, caipAddress } = useAppKitAccount();
   const [fundData, setFundData] = useState<FundData | undefined>(undefined);
   const [tokenData, setTokenData] = useState<TokenData | undefined>(undefined);
+
+  const ChainContracts = useMemo<Record<string, any> | undefined>(() => (
+    !isConnected ? undefined : Contracts[caipAddress.split(':')?.[1]]
+  ), [isConnected, caipAddress]);
 
   useEffect(() => {
     if (isConnected) {
       Promise.all([
         readContract(wagmiConfig, {
           address: fundAddress,
-          abi: Fund.abi,
+          abi: ChainContracts.Fund.abi,
           functionName: 'worker',
           args: [],
         }),
         readContract(wagmiConfig, {
           address: fundAddress,
-          abi: Fund.abi,
+          abi: ChainContracts.Fund.abi,
           functionName: 'oracle',
           args: [],
         }),
         readContract(wagmiConfig, {
           address: fundAddress,
-          abi: Fund.abi,
+          abi: ChainContracts.Fund.abi,
           functionName: 'payoutToken',
           args: [],
         }),
@@ -79,25 +82,25 @@ export default function FundPage({
       Promise.all([
         readContract(wagmiConfig, {
           address: fundData.token,
-          abi: FundToken.abi,
+          abi: ChainContracts.FundToken.abi,
           functionName: 'name',
           args: [],
         }),
         readContract(wagmiConfig, {
           address: fundData.token,
-          abi: FundToken.abi,
+          abi: ChainContracts.FundToken.abi,
           functionName: 'symbol',
           args: [],
         }),
         readContract(wagmiConfig, {
           address: fundData.token,
-          abi: FundToken.abi,
-          functionName: 'totalSupply',
-          args: [],
+          abi: ChainContracts.FundToken.abi,
+          functionName: 'balanceOf',
+          args: [fundAddress],
         }),
         readContract(wagmiConfig, {
           address: fundData.token,
-          abi: FundToken.abi,
+          abi: ChainContracts.FundToken.abi,
           functionName: 'decimals',
           args: [],
         }),
@@ -107,7 +110,7 @@ export default function FundPage({
         console.log(error);
       });
     }
-  }, [fundData]);
+  }, [fundAddress, fundData]);
 
   return (
     <div className="flex flex-col gap-y-4">
@@ -119,26 +122,31 @@ export default function FundPage({
         ) : (
           <ul>
             <li>
-              <strong>Worker:</strong> <Address address={fundData.worker} />
+              <strong>Worker: </strong>
+              <Address address={fundData.worker} />
             </li>
             <li>
-              <strong>Oracle:</strong> <Address address={fundData.oracle} />
+              <strong>Oracle: </strong>
+              <Address address={fundData.oracle} />
             </li>
             <li>
-              <strong>Token:</strong> <Address address={fundData.token} />
+              <strong>Token: </strong>
+              <Address address={fundData.token} />
               {(tokenData === undefined) ? (
                 <span>Loading...</span>
               ) : (
                 <ul>
                   <li>
-                    <strong>Name:</strong> {tokenData.name}
+                    <strong>Name: </strong>
+                    {tokenData.name}
                   </li>
                   <li>
-                    <strong>Symbol:</strong> {tokenData.symbol}
+                    <strong>Symbol: </strong>
+                    {tokenData.symbol}
                   </li>
                   <li>
-                    <strong>Supply:</strong>
-                    {formatNumber(formatUnits(tokenData.supply, tokenData.decimals))}
+                    <strong>Supply: </strong>
+                    {formatNumber(formatUnits(tokenData.supply, tokenData.decimals))} {tokenData.symbol}
                   </li>
                 </ul>
               )}

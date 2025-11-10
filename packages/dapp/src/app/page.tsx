@@ -1,4 +1,5 @@
 // import { cookieStorage, createStorage, http } from '@wagmi/core'
+import Link from 'next/link'
 import { ConnectButton } from "@/components/ConnectButton";
 import { InfoList } from "@/components/InfoList";
 import { ActionButtonList } from "@/components/ActionButtonList";
@@ -11,6 +12,12 @@ export default function Home() {
       <ConnectButton />
       <ActionButtonList />
       <SignMessageModule />
+      <Link
+        href={`/fund/0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512`}
+        className="link-button"
+      >
+        Sample Fund
+      </Link>
       <InfoList />
     </div>
   );

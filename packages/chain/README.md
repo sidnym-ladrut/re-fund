@@ -25,7 +25,8 @@ can deploy this module to a locally simulated chain or to Sepolia.
 To run the deployment to a local chain:
 
 ```shell
-npx hardhat ignition deploy ignition/modules/Counter.ts
+npx hardhat ignition deploy --network localhost ignition/modules/FundSample.ts
+npx hardhat run --no-compile script/SyncAbis.ts
 ```
 
 To run the deployment to Sepolia:
@@ -33,7 +34,7 @@ To run the deployment to Sepolia:
 ```shell
 npx hardhat keystore set SEPOLIA_RPC_URL
 npx hardhat keystore set SEPOLIA_PRIVATE_KEY
-npx hardhat ignition deploy --network sepolia ignition/modules/Counter.ts
+npx hardhat ignition deploy --network sepolia ignition/modules/FundSample.ts
 ```
 
 Then, optionally to verify it on Etherscan:
