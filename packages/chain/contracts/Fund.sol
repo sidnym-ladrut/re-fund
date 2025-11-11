@@ -17,7 +17,7 @@ contract Fund is Ownable, EIP712 {
   ////////////////////////
 
   /// @notice EIP712 type hash for the `Withdraw` action
-  bytes32 private constant _WITHDRAW_TYPEHASH = keccak256("Withdraw(uint256 amount,uint256 nonce)");
+  bytes32 private constant _WITHDRAW_TYPEHASH = keccak256("Withdraw(address fund,uint256 amount,uint256 nonce)");
   /// @notice The maximum permissible cut value (i.e. 2-digits 100%)
   uint256 private constant _CUT_MAXIMUM = 1e4;
 
@@ -255,7 +255,7 @@ contract Fund is Ownable, EIP712 {
   /// @param amount The amount of {payoutToken} that will be withdrawn
   /// @return hash The EIP-712 'Withdraw' payload that can be signed by the {oracle} to authorize a withdrawal
   function hashWithdraw(uint256 amount) public view returns (bytes32 hash) {
-    bytes32 structHash = keccak256(abi.encode(_WITHDRAW_TYPEHASH, amount, _nonce));
+    bytes32 structHash = keccak256(abi.encode(_WITHDRAW_TYPEHASH, address(this), amount, _nonce));
     return _hashTypedDataV4(structHash);
   }
 

@@ -20,7 +20,7 @@ export const ActionButtonList = () => {
     <div className="flex flex-row gap-x-4">
       <button onClick={() => open()}>Open</button>
       <button onClick={handleDisconnect}>Disconnect</button>
-      <button onClick={() => switchNetwork(APPKIT_NETWORKS[1]) }>Switch</button>
+      <button onClick={() => switchNetwork(APPKIT_NETWORKS[1])}>Switch</button>
     </div>
   )
 }
