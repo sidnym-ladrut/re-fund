@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.28;
 
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
-import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
 /// @title Fund
 /// @notice A treasury contract that manages payouts to a worker (the owner) with the approval of an oracle (the assessor) with ERC20 donations from funders (any donor)
 /// @author ~sidnym-ladrut -- DM on Urbit for more details
-contract Fund is Ownable, EIP712 {
-  ////////////////////////
-  // Constant Variables //
-  ////////////////////////
+contract Fund is Initializable, OwnableUpgradeable, EIP712Upgradeable {
+  ///////////////
+  // Constants //
+  ///////////////
 
   /// @notice EIP712 type hash for the `Withdraw` action
   bytes32 private constant _WITHDRAW_TYPEHASH = keccak256("Withdraw(address fund,uint256 amount,uint256 nonce)");
@@ -91,11 +93,14 @@ contract Fund is Ownable, EIP712 {
   // Functions //
   ///////////////
 
-  /// @notice Creates a fund with an initial set of terms
-  /// @dev This function is a thin wrapper for {updateTerms}
-  constructor(address oracle_, uint256 cut, ERC20Permit token, bytes32 terms)
-      Ownable(msg.sender) EIP712("Fund", "1") {
-    updateTerms(oracle_, cut, token, terms);
+  /// @notice TODO
+  function initialize(address owner_, bytes calldata args) initializer public {
+    __Ownable_init(owner_);
+    __EIP712_init("Fund", "1");
+
+    (address oracle_, uint256 cut, address token, bytes32 terms) =
+      abi.decode(args, (address, uint256, address, bytes32));
+    updateTerms(oracle_, cut, ERC20Permit(token), terms);
   }
 
   /// @notice The worker performing the tasks outlined in the terms for this fund
@@ -259,11 +264,11 @@ contract Fund is Ownable, EIP712 {
     return _hashTypedDataV4(structHash);
   }
 
-  /// @inheritdoc Ownable
+  /// @inheritdoc OwnableUpgradeable
   /// @dev This override prevents the fund contract from being transferred to another owner
   function _transferOwnership(address newOwner) internal override {
-    if (newOwner != msg.sender) {
-      revert Ownable.OwnableInvalidOwner(newOwner);
+    if (owner() != address(0)) {
+      revert OwnableUpgradeable.OwnableInvalidOwner(newOwner);
     }
     super._transferOwnership(newOwner);
   }

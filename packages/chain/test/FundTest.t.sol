@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Fund} from "../contracts/Fund.sol";
+import {FundFactory} from "../contracts/FundFactory.sol";
 import {FundToken, FUND_TOKEN_DECIMALS} from "../contracts/FundToken.sol";
 // import {console} from "forge-std/console.sol";
 
@@ -12,6 +13,10 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 
 // solc-ignore-next-line code-size
 contract FundTest is Test {
+  ///////////////
+  // Constants //
+  ///////////////
+
   uint256 constant LAUNCHER_PK = 1;
   uint256 constant WORKER_PK = 2;
   uint256 constant ORACLE_PK = 3;
@@ -26,13 +31,19 @@ contract FundTest is Test {
   uint256 constant DEPO_AMOUNT = 1e1 * 10 ** FUND_TOKEN_DECIMALS;
   uint256 constant DEPO_CUT = 1e0 * 10 ** FUND_TOKEN_DECIMALS;
 
-  Fund fund;
-  FundToken token;
+  /////////////////////
+  // State Variables //
+  /////////////////////
 
   address launcher;
   address worker;
   address oracle;
   address[] funders;
+
+  Fund fundImplementation;
+  FundFactory fundFactory;
+  FundToken token;
+  Fund fund;
 
   //////////////////////
   // Set Up/Tear Down //
@@ -51,29 +62,25 @@ contract FundTest is Test {
       token.transfer(funders[i], FUNDER_BASE_AMOUNT);
     }
 
+    vm.prank(launcher);
+    fundImplementation = new Fund();
+    vm.prank(launcher);
+    fundFactory = new FundFactory(address(fundImplementation));
+
     vm.prank(worker);
-    fund = new Fund(oracle, FUND_CUT, token, FUND_TERMS);
-    vm.prank(worker);
+    fund = Fund(fundFactory.deploy(abi.encode(oracle, FUND_CUT, token, FUND_TERMS)));
   }
 
   modifier locked() {
     bytes memory signature = _signAs191(FUND_TERMS, ORACLE_PK);
+    vm.prank(worker);
     fund.lockTerms(signature);
     _;
   }
 
-  modifier funded() {
-    _fundAs(0, DEPO_AMOUNT);
-    _;
-  }
-
-  modifier funded2() {
-    for (uint256 i = 0; i < 2; i++) { _fundAs(i, DEPO_AMOUNT); }
-    _;
-  }
-
-  modifier fundedN() {
-    for (uint256 i = 0; i < FUNDER_COUNT; i++) { _fundAs(i, i*DEPO_AMOUNT); }
+  modifier fundedBy(uint256 n) {
+    require(n <= FUNDER_COUNT);
+    for (uint256 i = 0; i < n; i++) { _fundAs(i, (i + 1) * DEPO_AMOUNT); }
     _;
   }
 
@@ -81,34 +88,42 @@ contract FundTest is Test {
   // Test Functions //
   ////////////////////
 
-  function test_constructor() public view {
+  function test_deploy() public view {
     assertEq(fund.worker(), worker);
     assertEq(fund.worker(), fund.owner());
     assertEq(fund.oracle(), oracle);
+
+    // assertEq(fundFactory.instances().length, 1);
+    // assertEq(fundFactory.instances(0), address(fund));
   }
 
   function test_lockTerms_success() public {
     bytes memory oracleTermsSignature = _signAs191(FUND_TERMS, ORACLE_PK);
+    vm.prank(worker);
     fund.lockTerms(oracleTermsSignature);
     assertEq(fund.termsSignature(), oracleTermsSignature);
   }
 
   function test_lockTerms_badSigner() public {
     bytes memory workerTermsSignature = _signAs191(FUND_TERMS, WORKER_PK);
+    vm.prank(worker);
     vm.expectRevert();
     fund.lockTerms(workerTermsSignature);
   }
 
   function test_lockTerms_badMessage() public {
     bytes memory oracleRandomSignature = _signAs191(BAD_TERMS, ORACLE_PK);
+    vm.prank(worker);
     vm.expectRevert();
     fund.lockTerms(oracleRandomSignature);
   }
 
   function test_lockTerms_postLock() public locked {
     bytes memory oracleTermsSignature = _signAs191(FUND_TERMS, ORACLE_PK);
+    vm.prank(worker);
     vm.expectRevert();
     fund.lockTerms(oracleTermsSignature);
+    vm.prank(worker);
     vm.expectRevert();
     fund.updateTerms(oracle, FUND_CUT, token, BAD_TERMS);
   }
@@ -118,6 +133,7 @@ contract FundTest is Test {
     bytes32 permitHash = token.hashPermit(funder, address(fund), DEPO_AMOUNT, block.timestamp);
     bytes memory funderDepositSignature = _signAsRaw(permitHash, funderPK);
 
+    vm.prank(funder);
     vm.expectEmit();
     emit Fund.Deposit(token, funder, DEPO_AMOUNT);
     fund.deposit(token, funder, DEPO_AMOUNT, funderDepositSignature);
@@ -133,7 +149,7 @@ contract FundTest is Test {
     fund.deposit(token, funder, DEPO_AMOUNT, funderDepositSignature);
   }
 
-  function test_withdraw_success() public locked funded {
+  function test_withdraw_success() public locked fundedBy(1) {
     bytes memory oracleWithdrawalSignature = _signAsRaw(fund.hashWithdraw(DEPO_AMOUNT), ORACLE_PK);
 
     vm.prank(worker);
@@ -146,21 +162,21 @@ contract FundTest is Test {
     assertEq(token.balanceOf(address(fund)), 0);
   }
 
-  function test_withdraw_badSigner() public locked funded {
+  function test_withdraw_badSigner() public locked fundedBy(1) {
     bytes memory workerWithdrawalSignature = _signAsRaw(fund.hashWithdraw(DEPO_AMOUNT), WORKER_PK);
     vm.prank(worker);
     vm.expectRevert();
     fund.withdraw(DEPO_AMOUNT, workerWithdrawalSignature);
   }
 
-  function test_withdraw_badMessage() public locked funded {
+  function test_withdraw_badMessage() public locked fundedBy(1) {
     bytes memory oracleRandomSignature = _signAs191(BAD_TERMS, ORACLE_PK);
     vm.prank(worker);
     vm.expectRevert();
     fund.withdraw(DEPO_AMOUNT, oracleRandomSignature);
   }
 
-  function test_withdraw_badAmount() public locked funded {
+  function test_withdraw_badAmount() public locked fundedBy(1) {
     bytes memory oracleRealWithdrawalSignature = _signAsRaw(fund.hashWithdraw(DEPO_AMOUNT), ORACLE_PK);
     bytes memory oracleZeroWithdrawalSignature = _signAsRaw(fund.hashWithdraw(0), ORACLE_PK);
 
@@ -177,7 +193,7 @@ contract FundTest is Test {
     fund.withdraw(0, oracleZeroWithdrawalSignature);
   }
 
-  function test_refund_uniDonor() public locked funded {
+  function test_refund_uniDonor() public locked fundedBy(1) {
     (address funder, ) = _funder();
     uint256 snapshot = vm.snapshotState();
     address[2] memory managers = [worker, oracle];
@@ -193,10 +209,10 @@ contract FundTest is Test {
     }
   }
 
-  function test_refund_multiDonor_basic() public locked funded2 {
+  function test_refund_multiDonor_basic() public locked fundedBy(2) {
     vm.prank(worker);
     vm.expectEmit();
-    emit Fund.Refund(worker, 2 * DEPO_AMOUNT);
+    emit Fund.Refund(worker, 3 * DEPO_AMOUNT);
     fund.refund();
 
     assertEq(token.balanceOf(address(fund)), 0);
@@ -206,9 +222,7 @@ contract FundTest is Test {
     }
   }
 
-  function test_refund_multiDonor_complex() public locked funded2 {
-    _fundAs(1, DEPO_AMOUNT);
-
+  function test_refund_multiDonor_complex() public locked fundedBy(2) {
     uint256 withdrawAmount = fund.funds() / 2;
     bytes memory oracleWithdrawalSignature = _signAsRaw(fund.hashWithdraw(withdrawAmount), ORACLE_PK);
     vm.prank(worker);
@@ -229,6 +243,7 @@ contract FundTest is Test {
   function _fundAs(uint256 index, uint256 amount) internal {
     (address funder, uint256 funderPK) = _funder(index);
     bytes memory signature = _signAsRaw(token.hashPermit(funder, address(fund), amount, block.timestamp), funderPK);
+    vm.prank(funder);
     fund.deposit(token, funder, amount, signature);
   }
 

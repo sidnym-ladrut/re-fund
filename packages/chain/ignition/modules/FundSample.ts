@@ -1,4 +1,5 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+// import { encodeAbiParameters, parseAbiParameters } from "viem";
 
 const FUND_TERMS: string = `0x${'0'.repeat(64)}`;
 // FIXME: Retrieved out-of-band through `npx hardhat run -- scripts/SignMessage.ts`
@@ -8,16 +9,23 @@ export default buildModule("FundSample", (m) => {
   const deployer = m.getAccount(0);
 
   const fundToken = m.contract("FundToken");
-  const fund = m.contract("Fund", [deployer, 1e3, fundToken, FUND_TERMS]);
+  const fundImplementation = m.contract("Fund", []);
+  const fundFactory = m.contract("FundFactory", [fundImplementation]);
 
-  m.call(fund, "lockTerms", [FUND_SIGN]);
-  // FIXME: Use number of active hardhat accounts as the upper limit here.
-  for (let i = 1; i < 10; i++) {
-    const funder = m.getAccount(i);
-    m.call(fundToken, "transfer", [funder, 1000n * 10n ** 18n], {
-      id: `FundToken_transfer_${i}`,
-    });
-  }
+  // const fundArgs = encodeAbiParameters(
+  //   parseAbiParameters('address oracle, uint256 cut, address token, bytes32 terms'),
+  //   [deployer, 1e3, fundToken, FUND_TERMS],
+  // );
+  // const fund = m.call(fundFactory, "deploy", [fundArgs]);
 
-  return { fund, fundToken };
+  // m.call(fund, "lockTerms", [FUND_SIGN]);
+  // // FIXME: Use number of active hardhat accounts as the upper limit here.
+  // for (let i = 1; i < 10; i++) {
+  //   const funder = m.getAccount(i);
+  //   m.call(fundToken, "transfer", [funder, 1000n * 10n ** 18n], {
+  //     id: `FundToken_transfer_${i}`,
+  //   });
+  // }
+
+  return { fundImplementation, fundFactory, fundToken };
 });
