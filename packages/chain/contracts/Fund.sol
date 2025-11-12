@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.28;
 
+import {IFund} from "./IFund.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
@@ -13,7 +14,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 /// @title Fund
 /// @notice A treasury contract that manages payouts to a worker (the owner) with the approval of an oracle (the assessor) with ERC20 donations from funders (any donor)
 /// @author ~sidnym-ladrut -- DM on Urbit for more details
-contract Fund is Initializable, OwnableUpgradeable, EIP712Upgradeable {
+contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   ///////////////
   // Constants //
   ///////////////
@@ -49,27 +50,16 @@ contract Fund is Initializable, OwnableUpgradeable, EIP712Upgradeable {
 
   /// @notice A local record of the funds deposited into this contract (by ERC20, funder)
   mapping(ERC20Permit => mapping(address => uint256)) private _treasury;
-  /// @notice Existence record for ERC20 entries in `_treasury`
+  /// @notice Existence record for ERC20 entries in {_treasury}
   mapping(ERC20Permit => bool) private _treasuryTokenMap;
-  /// @notice Key list for ERC20 entries in `_treasury`
+  /// @notice Key list for ERC20 entries in {_treasury}
   ERC20Permit[] public treasuryTokens;
-  /// @notice Existence record for address entries in `_treasury`
+  /// @notice Existence record for address entries in {_treasury}
   mapping(address => bool) private _treasuryFunderMap;
-  /// @notice Key list for address entries in `_treasury`
+  /// @notice Key list for address entries in {_treasury}
   address[] public treasuryFunders;
   /// @notice The oracle's signature on the work terms, which seals the fund
   bytes public termsSignature;
-
-  ////////////
-  // Events //
-  ////////////
-
-  /// @notice Notification for when tokens are deposited into the fund
-  event Deposit(ERC20Permit indexed token, address indexed from, uint256 amount);
-  /// @notice Notification for when tokens are withdrawn from the fund
-  event Withdrawal(uint256 amount);
-  /// @notice Notification for when a refund is issued
-  event Refund(address indexed refunder, uint256 amount);
 
   ///////////////
   // Modifiers //
@@ -97,15 +87,17 @@ contract Fund is Initializable, OwnableUpgradeable, EIP712Upgradeable {
   // Functions //
   ///////////////
 
-  /// @notice TODO
-  /// @dev TODO
+  /// @notice Constructs an empty template fund owned by the calling contract
+  /// @dev This should only be invoked once to create the implementation contract used by the factory
   constructor() initializer {
     __Ownable_init(msg.sender);
     __EIP712_init("Fund", "1");
   }
 
-  /// @notice TODO
-  function initialize(bytes calldata args) initializer public {
+  /// @notice Initializes a contract owned by a given worker with a set of starting terms
+  /// @dev This should only be invoked internally by the factory to initialize clone proxies
+  /// @param args The encoded arguments array containing the worker address and the terms (see {updateTerms})
+  function initialize(bytes calldata args) initializer external {
     (address worker_, address oracle_, uint256 cut, address token, bytes32 terms) =
       abi.decode(args, (address, address, uint256, address, bytes32));
 

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import {FundBaseTest} from "./FundBaseTest.sol";
+import {IFund} from "../contracts/IFund.sol";
 import {Fund} from "../contracts/Fund.sol";
 import {FUND_TOKEN_DECIMALS} from "../contracts/FundToken.sol";
 
@@ -97,7 +98,7 @@ contract FundTest is FundBaseTest {
 
     vm.prank(_funder());
     vm.expectEmit();
-    emit Fund.Deposit(_fundToken, _funder(), DEPO_AMOUNT);
+    emit IFund.Deposit(_fundToken, _funder(), DEPO_AMOUNT);
     _fund().deposit(_fundToken, _funder(), DEPO_AMOUNT, funderDepositSignature);
 
     assertEq(_fundToken.balanceOf(_funder()), FUNDER_BASE_AMOUNT - DEPO_AMOUNT);
@@ -115,7 +116,7 @@ contract FundTest is FundBaseTest {
 
     vm.prank(_worker());
     vm.expectEmit();
-    emit Fund.Withdrawal(DEPO_AMOUNT);
+    emit IFund.Withdrawal(DEPO_AMOUNT);
     _fund().withdraw(DEPO_AMOUNT, oracleWithdrawalSignature);
 
     assertEq(_fundToken.balanceOf(_worker()), DEPO_AMOUNT - ORACLE_CUT);
@@ -161,7 +162,7 @@ contract FundTest is FundBaseTest {
       vm.revertToState(snapshot);
       vm.prank(managers[i]);
       vm.expectEmit();
-      emit Fund.Refund(managers[i], DEPO_AMOUNT);
+      emit IFund.Refund(managers[i], DEPO_AMOUNT);
       _fund().refund();
 
       assertEq(_fundToken.balanceOf(address(_fund())), 0);
@@ -172,7 +173,7 @@ contract FundTest is FundBaseTest {
   function test_refund_multiDonor_basic() public locked fundedBy(2) {
     vm.prank(_worker());
     vm.expectEmit();
-    emit Fund.Refund(_worker(), 3 * DEPO_AMOUNT);
+    emit IFund.Refund(_worker(), 3 * DEPO_AMOUNT);
     _fund().refund();
 
     assertEq(_fundToken.balanceOf(address(_fund())), 0);

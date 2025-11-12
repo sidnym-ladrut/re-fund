@@ -63,7 +63,7 @@ abstract contract FundBaseTest is Test {
     _fundImplementation = new Fund();
 
     vm.prank(_launcher);
-    _fundFactory = new FundFactory(address(_fundImplementation));
+    _fundFactory = new FundFactory(_fundImplementation);
   }
 
   function _fundAs(Fund fund, address funder, uint256 amount) internal {
