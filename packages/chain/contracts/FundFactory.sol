@@ -42,7 +42,7 @@ contract FundFactory {
   function deploy(bytes calldata args, bytes32 salt) public returns (address) {
     bytes32 hash = bytes32(uint256(keccak256(args)) + uint256(salt));
     address proxy = Clones.cloneDeterministic(FUND_IMPLEMENTATION, hash);
-    Fund(proxy).initialize(msg.sender, args);
+    Fund(proxy).initialize(args);
 
     _instanceMap[msg.sender].push(proxy);
     _instances.push(proxy);

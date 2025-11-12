@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {FundBaseTest} from "./FundBaseTest.sol";
 import {Fund} from "../contracts/Fund.sol";
+import {FUND_TOKEN_DECIMALS} from "../contracts/FundToken.sol";
 
 // solc-ignore-next-line code-size
 contract FundTest is FundBaseTest {
@@ -12,6 +13,7 @@ contract FundTest is FundBaseTest {
 
   bytes32 public constant FUND_TERMS = bytes32(uint256(1000));
   bytes32 public constant BAD_TERMS = bytes32(uint256(1001));
+  uint256 public constant ORACLE_CUT = 1e0 * 10 ** FUND_TOKEN_DECIMALS;
 
   ///////////////
   // Modifiers //
@@ -39,7 +41,7 @@ contract FundTest is FundBaseTest {
   function setUp() public override {
     super.setUp();
 
-    bytes memory fundArgs = abi.encode(_oracle(), FUND_CUT, _fundToken, FUND_TERMS);
+    bytes memory fundArgs = abi.encode(_worker(), _oracle(), FUND_CUT, _fundToken, FUND_TERMS);
     vm.prank(_worker());
     _funds.push(Fund(_fundFactory.deploy(fundArgs)));
   }
@@ -116,8 +118,8 @@ contract FundTest is FundBaseTest {
     emit Fund.Withdrawal(DEPO_AMOUNT);
     _fund().withdraw(DEPO_AMOUNT, oracleWithdrawalSignature);
 
-    assertEq(_fundToken.balanceOf(_worker()), DEPO_AMOUNT - DEPO_CUT);
-    assertEq(_fundToken.balanceOf(_oracle()), DEPO_CUT);
+    assertEq(_fundToken.balanceOf(_worker()), DEPO_AMOUNT - ORACLE_CUT);
+    assertEq(_fundToken.balanceOf(_oracle()), ORACLE_CUT);
     assertEq(_fundToken.balanceOf(address(_fund())), 0);
   }
 

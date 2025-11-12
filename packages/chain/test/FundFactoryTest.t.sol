@@ -33,9 +33,7 @@ contract FundFactoryTest is FundBaseTest {
     super.setUp();
 
     for (uint256 i = 0; i < PERROLE_COUNT; i++) {
-      bytes32 fundTerms = bytes32(FUND_BASE_TERMS << i);
-      bytes memory fundArgs = abi.encode(_oracles[i % 2], FUND_CUT, _fundToken, fundTerms);
-
+      bytes memory fundArgs = abi.encode(_workers[i], _oracles[i % 2], 0, _fundToken, bytes32(FUND_BASE_TERMS << i));
       vm.prank(_workers[i]);
       _funds.push(Fund(_fundFactory.deploy(fundArgs)));
     }
@@ -46,18 +44,37 @@ contract FundFactoryTest is FundBaseTest {
   ////////////////////
 
   function test_deploy_implementation() public {
-    assertEq(_fundImplementation.owner(), address(0));
+    assertEq(_fundImplementation.owner(), _launcher);
 
-    bytes memory fundArgs = abi.encode(_oracles[0], FUND_CUT, _fundToken, FUND_BASE_TERMS);
-    vm.prank(_workers[0]);
+    bytes memory fundArgs = abi.encode(_launcher, _launcher, FUND_CUT, _fundToken, bytes32(uint256(0)));
+    vm.prank(_launcher);
     vm.expectRevert();
-    _fundImplementation.initialize(_launcher, fundArgs);
+    _fundImplementation.initialize(fundArgs);
   }
 
-  function test_deploy_success() public view {
+  function test_deploy_initalize() public view {
     assertEq(_fundFactory.instances().length, PERROLE_COUNT);
     for (uint256 i = 0; i < PERROLE_COUNT; i++) {
       assertEq(Fund(_fundFactory.instances(i)).worker(), _workers[i]);
+      assertEq(Fund(_fundFactory.instances(i)).oracle(), _oracles[i % 2]);
+    }
+  }
+
+  function test_clone_independent() public locked {
+    for (uint256 i = 0; i < PERROLE_COUNT; i++) {
+      vm.prank(_funders[i]);
+      _fundAs(_funds[i], _funders[i], (i + 1) * DEPO_AMOUNT);
+    }
+
+    bytes memory signature = _signAsRaw(_funds[0].oracle(), _funds[0].hashWithdraw(DEPO_AMOUNT));
+    vm.prank(_workers[0]);
+    _funds[0].withdraw(DEPO_AMOUNT, signature);
+
+    assertEq(_fundToken.balanceOf(_workers[0]), DEPO_AMOUNT);
+    assertEq(_fundToken.balanceOf(address(_funds[0])), 0);
+    for (uint256 i = 1; i < PERROLE_COUNT; i++) {
+      assertEq(_fundToken.balanceOf(_workers[i]), 0);
+      assertEq(_fundToken.balanceOf(address(_funds[i])), (i + 1) * DEPO_AMOUNT);
     }
   }
 }

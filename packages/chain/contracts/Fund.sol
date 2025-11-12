@@ -18,8 +18,12 @@ contract Fund is Initializable, OwnableUpgradeable, EIP712Upgradeable {
   // Constants //
   ///////////////
 
+  /// @notice EIP712 type hash for the `Initialize` action
+  bytes32 private constant _INITIALIZE_TYPEHASH =
+    keccak256("Initialize(address worker,address oracle,uint256 cut,address token,bytes32 terms)");
   /// @notice EIP712 type hash for the `Withdraw` action
-  bytes32 private constant _WITHDRAW_TYPEHASH = keccak256("Withdraw(address fund,uint256 amount,uint256 nonce)");
+  bytes32 private constant _WITHDRAW_TYPEHASH =
+    keccak256("Withdraw(address fund,uint256 amount,uint256 nonce)");
   /// @notice The maximum permissible cut value (i.e. 2-digits 100%)
   uint256 private constant _CUT_MAXIMUM = 1e4;
 
@@ -94,12 +98,19 @@ contract Fund is Initializable, OwnableUpgradeable, EIP712Upgradeable {
   ///////////////
 
   /// @notice TODO
-  function initialize(address owner_, bytes calldata args) initializer public {
-    __Ownable_init(owner_);
+  /// @dev TODO
+  constructor() initializer {
+    __Ownable_init(msg.sender);
     __EIP712_init("Fund", "1");
+  }
 
-    (address oracle_, uint256 cut, address token, bytes32 terms) =
-      abi.decode(args, (address, uint256, address, bytes32));
+  /// @notice TODO
+  function initialize(bytes calldata args) initializer public {
+    (address worker_, address oracle_, uint256 cut, address token, bytes32 terms) =
+      abi.decode(args, (address, address, uint256, address, bytes32));
+
+    __Ownable_init(worker_);
+    __EIP712_init("Fund", "1");
     updateTerms(oracle_, cut, ERC20Permit(token), terms);
   }
 
