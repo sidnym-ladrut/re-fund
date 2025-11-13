@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.28;
 
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 /// @title IFund
@@ -24,4 +25,11 @@ interface IFund {
 
   /// @notice Initializes a fund given a generic set of terms (see individual implementations for details)
   function initialize(bytes calldata args) external;
+
+  /// @notice Interface for {OwnableUpgradeable.owner}
+  function owner() external returns (address);
+  /// @notice Interface for {OwnableUpgradeable.renounceOwnership}
+  function renounceOwnership() external;
+  /// @notice Interface for {OwnableUpgradeable.transferOwnership}
+  function transferOwnership(address newOwner) external;
 }

@@ -112,6 +112,21 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
     return owner();
   }
 
+  /// @inheritdoc OwnableUpgradeable
+  function owner() public view override(IFund, OwnableUpgradeable) returns (address) {
+    return super.owner();
+  }
+
+  /// @inheritdoc OwnableUpgradeable
+  function renounceOwnership() public override(IFund, OwnableUpgradeable) {
+    super.renounceOwnership();
+  }
+
+  /// @inheritdoc OwnableUpgradeable
+  function transferOwnership(address newOwner) public override(IFund, OwnableUpgradeable) {
+    super.transferOwnership(newOwner);
+  }
+
   /// @notice Modifies the set of terms for this fund contract
   /// @param oracle_ The address of the account that will assess and sign off on the work for this fund
   /// @param cut The percentage compensation allotted to the oracle on withdrawal as a 2-digits integer value

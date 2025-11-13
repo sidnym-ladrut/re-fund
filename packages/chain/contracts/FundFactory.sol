@@ -58,13 +58,12 @@ contract FundFactory {
     bytes32 hash = bytes32(uint256(keccak256(args)) + uint256(salt));
     proxy = Clones.cloneDeterministic(address(FUND_IMPLEMENTATION), hash);
     IFund(proxy).initialize(args);
+    address owner = IFund(proxy).owner();
 
-    // FIXME: Should probably be the worker set for this deployment instead
-    _instanceMap[msg.sender].push(proxy);
+    _instanceMap[owner].push(proxy);
     _instances.push(proxy);
 
-    // FIXME: Should probably be the worker set for this deployment instead
-    emit Deploy(msg.sender);
+    emit Deploy(owner);
   }
 
   /// @notice Accessor for proxy contracts
