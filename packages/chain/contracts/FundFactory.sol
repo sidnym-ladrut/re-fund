@@ -20,7 +20,9 @@ contract FundFactory {
   /////////////////////
 
   /// @notice A local record of all the {IFund} proxies manufactured by this contract (by worker)
-  mapping(address => address[]) private _instanceMap;
+  mapping(address => address[]) private _workerInstanceMap;
+  /// @notice A local record of all the {IFund} proxies manufactured by this contract (by oracle)
+  mapping(address => address[]) private _oracleInstanceMap;
   /// @notice Key list for {IFund} addresses in {_instanceMap}
   address[] private _instances;
 
@@ -29,7 +31,7 @@ contract FundFactory {
   ////////////
 
   /// @notice Notification for when a new fund contract has been instantiated
-  event Deploy(address indexed worker);
+  event Deploy(address indexed worker, address indexed oracle);
 
   ///////////////
   // Functions //
@@ -58,12 +60,14 @@ contract FundFactory {
     bytes32 hash = bytes32(uint256(keccak256(args)) + uint256(salt));
     proxy = Clones.cloneDeterministic(address(FUND_IMPLEMENTATION), hash);
     IFund(proxy).initialize(args);
-    address owner = IFund(proxy).owner();
 
-    _instanceMap[owner].push(proxy);
+    address worker = IFund(proxy).worker();
+    address oracle = IFund(proxy).oracle();
+    _workerInstanceMap[worker].push(proxy);
+    _oracleInstanceMap[oracle].push(proxy);
     _instances.push(proxy);
 
-    emit Deploy(owner);
+    emit Deploy(worker, oracle);
   }
 
   /// @notice Accessor for proxy contracts
@@ -79,10 +83,20 @@ contract FundFactory {
     return _instances[i];
   }
 
-  /// @notice Accessor for a set of proxy contracts (indexed by owner)
-  /// @param owner The address of the owner for the proxy contracts to be returned
-  /// @return The set of {owner}'s proxy contract deployed through this factory
-  function instances(address owner) external view returns (address[] memory) {
-    return _instanceMap[owner];
+  /// @notice Accessor for a set of proxy contracts (indexed by role)
+  /// @param account The address of the account for the proxy contracts to be returned
+  /// @return The set of {account}'s proxy contract deployed through this factory
+  function instances(address account, IFund.Role role) external view returns (address[] memory) {
+    // TODO: Implement the expensive lookup for funders
+    require(
+      role == IFund.Role.Worker || role == IFund.Role.Oracle,
+      "Factory instances can only currently be queried by worker or oracle"
+    );
+
+    if (role == IFund.Role.Worker) {
+      return _workerInstanceMap[account];
+    } else {
+      return _oracleInstanceMap[account];
+    }
   }
 }

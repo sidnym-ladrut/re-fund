@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {FundBaseTest} from "./FundBaseTest.sol";
 import {Fund} from "../contracts/Fund.sol";
+import {IFund} from "../contracts/IFund.sol";
 
 // solc-ignore-next-line code-size
 contract FundFactoryTest is FundBaseTest {
@@ -11,6 +12,14 @@ contract FundFactoryTest is FundBaseTest {
   ///////////////
 
   bytes32 public constant FUND_BASE_TERMS = bytes32(uint256(1000));
+
+  /////////////////////
+  // State Variables //
+  /////////////////////
+
+  /// @dev This is a test reference variable that needs to be a state variable because of Solidity's
+  /// constraints on function scope variable types
+  address[][] private _oracleContractsMap;
 
   ///////////////
   // Modifiers //
@@ -32,10 +41,15 @@ contract FundFactoryTest is FundBaseTest {
   function setUp() public override {
     super.setUp();
 
+    _oracleContractsMap = new address[][](0);
     for (uint256 i = 0; i < PERROLE_COUNT; i++) {
       bytes memory fundArgs = abi.encode(_workers[i], _oracles[i % 2], 0, _fundToken, bytes32(FUND_BASE_TERMS << i));
       vm.prank(_workers[i]);
-      _funds.push(Fund(_fundFactory.deploy(fundArgs)));
+      Fund fundContract = Fund(_fundFactory.deploy(fundArgs));
+
+      _funds.push(fundContract);
+      _oracleContractsMap.push(new address[](0));
+      _oracleContractsMap[i % 2].push(address(fundContract));
     }
   }
 
@@ -52,11 +66,24 @@ contract FundFactoryTest is FundBaseTest {
     _fundImplementation.initialize(fundArgs);
   }
 
-  function test_deploy_initalize() public view {
+  function test_deploy_initalize() public {
     assertEq(_fundFactory.instances().length, PERROLE_COUNT);
+
     for (uint256 i = 0; i < PERROLE_COUNT; i++) {
-      assertEq(Fund(_fundFactory.instances(i)).worker(), _workers[i]);
-      assertEq(Fund(_fundFactory.instances(i)).oracle(), _oracles[i % 2]);
+      Fund fundContract = Fund(_fundFactory.instances(i));
+      assertEq(fundContract.worker(), _workers[i]);
+      assertEq(fundContract.oracle(), _oracles[i % 2]);
+    }
+
+    for (uint256 i = 0; i < PERROLE_COUNT; i++) {
+      address[] memory workerContracts = _fundFactory.instances(_workers[i], IFund.Role.Worker);
+      assertEq(workerContracts.length, 1);
+      assertEq(workerContracts[0], _fundFactory.instances(i));
+    }
+
+    for (uint256 i = 0; i < PERROLE_COUNT; i++) {
+      address[] memory oracleContracts = _fundFactory.instances(_oracles[i], IFund.Role.Oracle);
+      assertEq(oracleContracts, _oracleContractsMap[i]);
     }
   }
 

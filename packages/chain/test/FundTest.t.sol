@@ -89,7 +89,7 @@ contract FundTest is FundBaseTest {
     _fund().lockTerms(oracleTermsSignature);
     vm.prank(_worker());
     vm.expectRevert();
-    _fund().updateTerms(_oracle(), FUND_CUT, _fundToken, BAD_TERMS);
+    _fund().updateTerms(FUND_CUT, _fundToken, BAD_TERMS);
   }
 
   function test_deposit_success() public locked {

@@ -8,6 +8,17 @@ import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20P
 /// @notice Interface for Fund contracts
 /// @author ~sidnym-ladrut -- DM on Urbit for more details
 interface IFund {
+  /////////////////
+  // Types/Enums //
+  /////////////////
+
+  /// @notice Identifiers for the different roles an account can have in a fund
+  enum Role {
+    Worker,
+    Oracle,
+    Funder
+  }
+
   ////////////
   // Events //
   ////////////
@@ -26,10 +37,10 @@ interface IFund {
   /// @notice Initializes a fund given a generic set of terms (see individual implementations for details)
   function initialize(bytes calldata args) external;
 
-  /// @notice Interface for {OwnableUpgradeable.owner}
-  function owner() external returns (address);
-  /// @notice Interface for {OwnableUpgradeable.renounceOwnership}
-  function renounceOwnership() external;
-  /// @notice Interface for {OwnableUpgradeable.transferOwnership}
-  function transferOwnership(address newOwner) external;
+  /// @notice The worker performing the tasks outlined in the terms for this fund
+  /// @dev This value is always the same as the contract owner
+  function worker() external returns (address);
+  /// @notice The oracle assessing the tasks to be performed by the worker
+  /// @dev This value can be the same as {worker} for a self-assessed contract
+  function oracle() external returns (address);
 }

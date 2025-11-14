@@ -92,6 +92,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   constructor() initializer {
     __Ownable_init(msg.sender);
     __EIP712_init("Fund", "1");
+    oracle = msg.sender;
   }
 
   /// @notice Initializes a contract owned by a given worker with a set of starting terms
@@ -103,39 +104,23 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
 
     __Ownable_init(worker_);
     __EIP712_init("Fund", "1");
-    updateTerms(oracle_, cut, ERC20Permit(token), terms);
+    oracle = oracle_;
+
+    updateTerms(cut, ERC20Permit(token), terms);
   }
 
-  /// @notice The worker performing the tasks outlined in the terms for this fund
-  /// @dev This value is always the same as the contract owner
+  /// @inheritdoc IFund
   function worker() external view returns (address) {
     return owner();
   }
 
-  /// @inheritdoc OwnableUpgradeable
-  function owner() public view override(IFund, OwnableUpgradeable) returns (address) {
-    return super.owner();
-  }
-
-  /// @inheritdoc OwnableUpgradeable
-  function renounceOwnership() public override(IFund, OwnableUpgradeable) {
-    super.renounceOwnership();
-  }
-
-  /// @inheritdoc OwnableUpgradeable
-  function transferOwnership(address newOwner) public override(IFund, OwnableUpgradeable) {
-    super.transferOwnership(newOwner);
-  }
-
   /// @notice Modifies the set of terms for this fund contract
-  /// @param oracle_ The address of the account that will assess and sign off on the work for this fund
   /// @param cut The percentage compensation allotted to the oracle on withdrawal as a 2-digits integer value
   /// @param token The address of the ERC20Permit token that will be paid out to the worker
   /// @param terms The IPFS CID of the JSON blob defining the scope of work for this fund
-  function updateTerms(address oracle_, uint256 cut, ERC20Permit token, bytes32 terms)
+  function updateTerms(uint256 cut, ERC20Permit token, bytes32 terms)
       public beforeLocked {
     require(cut <= _CUT_MAXIMUM, "Oracle cut must be a 2-digit percentage (0 <= cut <= 1e4)");
-    oracle = oracle_;
     oracleCut = cut;
     payoutToken = token;
     termsCID = terms;
