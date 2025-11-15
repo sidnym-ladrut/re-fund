@@ -17,24 +17,36 @@ npx hardhat test solidity
 npx hardhat test nodejs
 ```
 
-### Deploying Contracts
-
-This project includes an example Ignition module to deploy the contract. You
-can deploy this module to a locally simulated chain or to Sepolia.
+### Deploying/Testing Locally
 
 To run the deployment to a local chain:
 
 ```shell
-npx hardhat ignition deploy --network localhost ignition/modules/FundSample.ts
-npx hardhat run --no-compile script/SyncAbis.ts
+npx hardhat ignition deploy --network localhost ignition/modules/FundFactory.ts
+npx hardhat ignition deploy --network localhost ignition/modules/FundToken.ts
 ```
+
+To create a test environment with a ready-made fund (runs the above automatically):
+
+```shell
+npx hardhat run --no-compile scripts/DeployTestEnv.ts
+```
+
+To synchronize the contract ABIs to the dApp:
+
+```shell
+npx hardhat run --no-compile scripts/SyncAbis.ts
+```
+
+### Deploying to Testnet
 
 To run the deployment to Sepolia:
 
 ```shell
 npx hardhat keystore set SEPOLIA_RPC_URL
 npx hardhat keystore set SEPOLIA_PRIVATE_KEY
-npx hardhat ignition deploy --network sepolia ignition/modules/FundSample.ts
+npx hardhat ignition deploy --network sepolia ignition/modules/FundFactory.ts
+npx hardhat ignition deploy --network sepolia ignition/modules/FundToken.ts
 ```
 
 Then, optionally to verify it on Etherscan:
@@ -42,5 +54,6 @@ Then, optionally to verify it on Etherscan:
 ```shell
 npx hardhat keystore set ETHERSCAN_API_KEY
 npx hardhat ignition verify --network sepolia chain-11155111
-npx hardhat ignition deploy --verify --network sepolia ignition/modules/Counter.ts
+npx hardhat ignition deploy --verify --network sepolia ignition/modules/FundFactory.ts
+npx hardhat ignition deploy --verify --network sepolia ignition/modules/FundToken.ts
 ```

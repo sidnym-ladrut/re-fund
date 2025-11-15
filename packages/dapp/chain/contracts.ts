@@ -1,36 +1,20 @@
 const CONTRACTS = {31337:{
   "Fund": {
-    "address": "0xf5059a5D33d5853360D16C683c16e67980206f36",
+    "address": "0x162A433068F51e18b7d13932F27e66a3f99E6890",
     "abi": [
       {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "oracle_",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "cut",
-            "type": "uint256"
-          },
-          {
-            "internalType": "contract ERC20Permit",
-            "name": "token",
-            "type": "address"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "terms",
-            "type": "bytes32"
-          }
-        ],
+        "inputs": [],
         "stateMutability": "nonpayable",
         "type": "constructor"
       },
       {
         "inputs": [],
-        "name": "InvalidShortString",
+        "name": "InvalidInitialization",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "NotInitializing",
         "type": "error"
       },
       {
@@ -53,17 +37,6 @@ const CONTRACTS = {31337:{
           }
         ],
         "name": "OwnableUnauthorizedAccount",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "string",
-            "name": "str",
-            "type": "string"
-          }
-        ],
-        "name": "StringTooLong",
         "type": "error"
       },
       {
@@ -95,6 +68,19 @@ const CONTRACTS = {31337:{
         "anonymous": false,
         "inputs": [],
         "name": "EIP712DomainChanged",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": false,
+            "internalType": "uint64",
+            "name": "version",
+            "type": "uint64"
+          }
+        ],
+        "name": "Initialized",
         "type": "event"
       },
       {
@@ -281,6 +267,19 @@ const CONTRACTS = {31337:{
         "inputs": [
           {
             "internalType": "bytes",
+            "name": "args",
+            "type": "bytes"
+          }
+        ],
+        "name": "initialize",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes",
             "name": "oracleSignature",
             "type": "bytes"
           }
@@ -436,11 +435,6 @@ const CONTRACTS = {31337:{
       {
         "inputs": [
           {
-            "internalType": "address",
-            "name": "oracle_",
-            "type": "address"
-          },
-          {
             "internalType": "uint256",
             "name": "cut",
             "type": "uint256"
@@ -495,69 +489,27 @@ const CONTRACTS = {31337:{
     ],
     "inheritedFunctions": {}
   },
-  "FundToken": {
-    "address": "0x851356ae760d987E095750cCeb3bC6014560891C",
+  "FundFactory": {
+    "address": "0x922D6956C99E12DFeB3224DEA977D0939758A1Fe",
     "abi": [
       {
-        "inputs": [],
+        "inputs": [
+          {
+            "internalType": "contract IFund",
+            "name": "fundImplementation",
+            "type": "address"
+          }
+        ],
         "stateMutability": "nonpayable",
         "type": "constructor"
       },
       {
         "inputs": [],
-        "name": "ECDSAInvalidSignature",
+        "name": "FailedDeployment",
         "type": "error"
       },
       {
         "inputs": [
-          {
-            "internalType": "uint256",
-            "name": "length",
-            "type": "uint256"
-          }
-        ],
-        "name": "ECDSAInvalidSignatureLength",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "bytes32",
-            "name": "s",
-            "type": "bytes32"
-          }
-        ],
-        "name": "ECDSAInvalidSignatureS",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "spender",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "allowance",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "needed",
-            "type": "uint256"
-          }
-        ],
-        "name": "ERC20InsufficientAllowance",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "sender",
-            "type": "address"
-          },
           {
             "internalType": "uint256",
             "name": "balance",
@@ -569,110 +521,7 @@ const CONTRACTS = {31337:{
             "type": "uint256"
           }
         ],
-        "name": "ERC20InsufficientBalance",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "approver",
-            "type": "address"
-          }
-        ],
-        "name": "ERC20InvalidApprover",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "receiver",
-            "type": "address"
-          }
-        ],
-        "name": "ERC20InvalidReceiver",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "sender",
-            "type": "address"
-          }
-        ],
-        "name": "ERC20InvalidSender",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "spender",
-            "type": "address"
-          }
-        ],
-        "name": "ERC20InvalidSpender",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "uint256",
-            "name": "deadline",
-            "type": "uint256"
-          }
-        ],
-        "name": "ERC2612ExpiredSignature",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "signer",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "owner",
-            "type": "address"
-          }
-        ],
-        "name": "ERC2612InvalidSigner",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "account",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "currentNonce",
-            "type": "uint256"
-          }
-        ],
-        "name": "InvalidAccountNonce",
-        "type": "error"
-      },
-      {
-        "inputs": [],
-        "name": "InvalidShortString",
-        "type": "error"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "string",
-            "name": "str",
-            "type": "string"
-          }
-        ],
-        "name": "StringTooLong",
+        "name": "InsufficientBalance",
         "type": "error"
       },
       {
@@ -681,64 +530,27 @@ const CONTRACTS = {31337:{
           {
             "indexed": true,
             "internalType": "address",
-            "name": "owner",
+            "name": "worker",
             "type": "address"
           },
           {
             "indexed": true,
             "internalType": "address",
-            "name": "spender",
+            "name": "oracle",
             "type": "address"
-          },
-          {
-            "indexed": false,
-            "internalType": "uint256",
-            "name": "value",
-            "type": "uint256"
           }
         ],
-        "name": "Approval",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [],
-        "name": "EIP712DomainChanged",
-        "type": "event"
-      },
-      {
-        "anonymous": false,
-        "inputs": [
-          {
-            "indexed": true,
-            "internalType": "address",
-            "name": "from",
-            "type": "address"
-          },
-          {
-            "indexed": true,
-            "internalType": "address",
-            "name": "to",
-            "type": "address"
-          },
-          {
-            "indexed": false,
-            "internalType": "uint256",
-            "name": "value",
-            "type": "uint256"
-          }
-        ],
-        "name": "Transfer",
+        "name": "Deploy",
         "type": "event"
       },
       {
         "inputs": [],
-        "name": "DOMAIN_SEPARATOR",
+        "name": "FUND_IMPLEMENTATION",
         "outputs": [
           {
-            "internalType": "bytes32",
+            "internalType": "contract IFund",
             "name": "",
-            "type": "bytes32"
+            "type": "address"
           }
         ],
         "stateMutability": "view",
@@ -747,46 +559,17 @@ const CONTRACTS = {31337:{
       {
         "inputs": [
           {
-            "internalType": "address",
-            "name": "owner",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "spender",
-            "type": "address"
+            "internalType": "bytes",
+            "name": "args",
+            "type": "bytes"
           }
         ],
-        "name": "allowance",
+        "name": "deploy",
         "outputs": [
           {
-            "internalType": "uint256",
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {
             "internalType": "address",
-            "name": "spender",
+            "name": "proxy",
             "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "value",
-            "type": "uint256"
-          }
-        ],
-        "name": "approve",
-        "outputs": [
-          {
-            "internalType": "bool",
-            "name": "",
-            "type": "bool"
           }
         ],
         "stateMutability": "nonpayable",
@@ -795,120 +578,54 @@ const CONTRACTS = {31337:{
       {
         "inputs": [
           {
-            "internalType": "address",
-            "name": "account",
-            "type": "address"
-          }
-        ],
-        "name": "balanceOf",
-        "outputs": [
-          {
-            "internalType": "uint256",
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "decimals",
-        "outputs": [
-          {
-            "internalType": "uint8",
-            "name": "",
-            "type": "uint8"
-          }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "eip712Domain",
-        "outputs": [
-          {
-            "internalType": "bytes1",
-            "name": "fields",
-            "type": "bytes1"
-          },
-          {
-            "internalType": "string",
-            "name": "name",
-            "type": "string"
-          },
-          {
-            "internalType": "string",
-            "name": "version",
-            "type": "string"
-          },
-          {
-            "internalType": "uint256",
-            "name": "chainId",
-            "type": "uint256"
-          },
-          {
-            "internalType": "address",
-            "name": "verifyingContract",
-            "type": "address"
+            "internalType": "bytes",
+            "name": "args",
+            "type": "bytes"
           },
           {
             "internalType": "bytes32",
             "name": "salt",
             "type": "bytes32"
-          },
-          {
-            "internalType": "uint256[]",
-            "name": "extensions",
-            "type": "uint256[]"
           }
         ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "owner",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "spender",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "value",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "deadline",
-            "type": "uint256"
-          }
-        ],
-        "name": "hashPermit",
+        "name": "deploy",
         "outputs": [
           {
-            "internalType": "bytes32",
-            "name": "",
-            "type": "bytes32"
+            "internalType": "address",
+            "name": "proxy",
+            "type": "address"
           }
         ],
-        "stateMutability": "view",
+        "stateMutability": "nonpayable",
         "type": "function"
       },
       {
         "inputs": [],
-        "name": "name",
+        "name": "instances",
         "outputs": [
           {
-            "internalType": "string",
+            "internalType": "address[]",
             "name": "",
-            "type": "string"
+            "type": "address[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "i",
+            "type": "uint256"
+          }
+        ],
+        "name": "instances",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
           }
         ],
         "stateMutability": "view",
@@ -918,141 +635,24 @@ const CONTRACTS = {31337:{
         "inputs": [
           {
             "internalType": "address",
-            "name": "owner",
-            "type": "address"
-          }
-        ],
-        "name": "nonces",
-        "outputs": [
-          {
-            "internalType": "uint256",
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "owner",
+            "name": "account",
             "type": "address"
           },
           {
-            "internalType": "address",
-            "name": "spender",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "value",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "deadline",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint8",
-            "name": "v",
+            "internalType": "enum IFund.Role",
+            "name": "role",
             "type": "uint8"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "r",
-            "type": "bytes32"
-          },
-          {
-            "internalType": "bytes32",
-            "name": "s",
-            "type": "bytes32"
           }
         ],
-        "name": "permit",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "symbol",
+        "name": "instances",
         "outputs": [
           {
-            "internalType": "string",
+            "internalType": "address[]",
             "name": "",
-            "type": "string"
+            "type": "address[]"
           }
         ],
         "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "totalSupply",
-        "outputs": [
-          {
-            "internalType": "uint256",
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "to",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "value",
-            "type": "uint256"
-          }
-        ],
-        "name": "transfer",
-        "outputs": [
-          {
-            "internalType": "bool",
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "from",
-            "type": "address"
-          },
-          {
-            "internalType": "address",
-            "name": "to",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "value",
-            "type": "uint256"
-          }
-        ],
-        "name": "transferFrom",
-        "outputs": [
-          {
-            "internalType": "bool",
-            "name": "",
-            "type": "bool"
-          }
-        ],
-        "stateMutability": "nonpayable",
         "type": "function"
       }
     ],
