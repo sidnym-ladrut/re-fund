@@ -29,7 +29,7 @@ npx hardhat ignition deploy --network localhost ignition/modules/FundToken.ts
 To create a test environment with a ready-made fund (runs the above automatically):
 
 ```shell
-npx hardhat run --no-compile scripts/DeployTestEnv.ts
+npx hardhat run --no-compile --network localhost scripts/DeployTestEnv.ts
 ```
 
 To synchronize the contract ABIs to the dApp:

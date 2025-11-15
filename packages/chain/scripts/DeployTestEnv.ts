@@ -1,4 +1,4 @@
-import hre from "hardhat";
+import { network } from "hardhat";
 import { encodeAbiParameters, parseAbiParameters } from "viem";
 import FundFactory from "../ignition/modules/FundFactory.ts";
 import FundToken from "../ignition/modules/FundToken.ts";
@@ -7,15 +7,16 @@ const FUND_TERMS: string = `0x${'0'.repeat(64)}`;
 const FUND_TOKEN_DRIP: BigInt = 1000000n;
 
 async function main() {
-  const connection = await hre.network.connect();
-  const { fundImplementation, fundFactory } = await connection.ignition.deploy(FundFactory);
-  const { fundToken } = await connection.ignition.deploy(FundToken);
+  const { ignition, viem } = await network.connect();
+  const { fundImplementation, fundFactory } = await ignition.deploy(FundFactory);
+  const { fundToken } = await ignition.deploy(FundToken);
 
-  const publicClient = await connection.viem.getPublicClient();
-  const walletClient = await connection.viem.getWalletClient();
+  const publicClient = await viem.getPublicClient();
+  const walletClient = await viem.getWalletClient();
   const [deployer, ...accounts] = await walletClient.getAddresses();
 
-  { // Distribute Test Tokens //
+  {
+    console.log(`Distributing test tokens...`);
     for (const account of accounts) {
       const accountBalance = (await publicClient.readContract({
         address: fundToken.address,
@@ -33,11 +34,13 @@ async function main() {
           args: [account, FUND_TOKEN_DRIP * 10n ** 18n],
         });
         const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        console.log(`> ${FUND_TOKEN_DRIP} $fund => ${account} (${receipt.status})`);
       }
     }
   }
 
-  { // Deploy Test Fund //
+  {
+    console.log(`Deploying test contract...`);
     let existingFunds = (await publicClient.readContract({
       address: fundFactory.address,
       abi: fundFactory.abi,
@@ -60,6 +63,7 @@ async function main() {
       const hash = await walletClient.writeContract(request);
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
       existingFunds.push(result);
+      console.log(`> Construct fund => ${result} (${receipt.status})`);
     }
 
     const fundSignature = (await publicClient.readContract({
@@ -81,9 +85,11 @@ async function main() {
         args: [termsSign],
       });
       const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      console.log(`> Locking in fund => ${termsSign} (${receipt.status})`);
     }
 
-    console.log(`Fund Contract @ ${existingFunds[0]}`);
+    console.log(`Finished!`);
+    console.log(`> Fund Contract @ ${existingFunds[0]}`);
     console.log(`> Worker @ ${deployer}`);
   }
 }
