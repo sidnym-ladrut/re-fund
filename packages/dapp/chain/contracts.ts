@@ -1,6 +1,6 @@
 const CONTRACTS = {31337:{
   "Fund": {
-    "address": "0xc6e7DF5E7b4f2A278906862b61205850344D4e7d",
+    "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
     "abi": [
       {
         "inputs": [],
@@ -490,7 +490,7 @@ const CONTRACTS = {31337:{
     "inheritedFunctions": {}
   },
   "FundFactory": {
-    "address": "0x59b670e9fA9D0A427751Af201D676719a970857b",
+    "address": "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9",
     "abi": [
       {
         "inputs": [
@@ -659,7 +659,7 @@ const CONTRACTS = {31337:{
     "inheritedFunctions": {}
   },
   "FundToken": {
-    "address": "0x4ed7c70F96B99c776995fB64377f0d4aB3B0e1C1",
+    "address": "0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9",
     "abi": [
       {
         "inputs": [],

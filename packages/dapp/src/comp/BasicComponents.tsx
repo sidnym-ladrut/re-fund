@@ -3,11 +3,10 @@
 import { useRouter } from 'next/navigation'
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useAppKitAccount } from "@reown/appkit/react";
 import { readContract } from '@wagmi/core'
-import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
-import { ConnectButton } from "@/comp/ConnectButton";
+import { useChainContracts } from "@/hook/wallet";
 import { APPKIT_WAGMI } from "@/cfg";
-import Contracts from '@/../chain/contracts'
 
 export function FundSearch() {
   const [input, setInput] = useState<string>("");
@@ -49,9 +48,10 @@ export function WalletDirectory({
 }: {
   type: number;
 }) {
-  const [funds, setFunds] = useState<string[]>([]);
-  const { address, isConnected, caipAddress } = useAppKitAccount();
   const router = useRouter()
+  const { address } = useAppKitAccount();
+  const chainContracts = useChainContracts();
+  const [funds, setFunds] = useState<string[]>([]);
 
   const onChange = useCallback((event: ChangeEvent<HTMLSelectElement>) => {
     const { value }: { value: string; } = event.target;
@@ -68,8 +68,7 @@ export function WalletDirectory({
 
   useEffect(() => {
     const getWorkerContracts = async () => {
-      if (isConnected) {
-        const chainContracts = Contracts[caipAddress.split(':')?.[1]];
+      if (!!chainContracts) {
         const workerInstances = (await readContract(APPKIT_WAGMI.wagmiConfig, {
           address: chainContracts.FundFactory.address,
           abi: chainContracts.FundFactory.abi,
@@ -80,11 +79,11 @@ export function WalletDirectory({
       }
     };
     getWorkerContracts();
-  }, [address, caipAddress, isConnected, setFunds]);
+  }, [address, chainContracts, setFunds]);
 
-  return !isConnected ? null : (
+  return !chainContracts ? null : (
     <div className="flex flex-col gap-1">
-      <h2>{typeTitle} Fund Contracts</h2>
+      <h2>Wallet Funds as {typeTitle}</h2>
       <select
         className="border-black border-1 px-2 py-1"
         onChange={onChange}

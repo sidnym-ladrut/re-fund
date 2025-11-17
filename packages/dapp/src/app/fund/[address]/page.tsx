@@ -5,13 +5,11 @@ import { readContract } from '@wagmi/core'
 import { formatUnits } from 'viem'
 
 import type { Provider } from "@reown/appkit/react";
-import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
+import { useAppKitAccount } from "@reown/appkit/react";
 import { Address } from "@/comp/Address";
-import { ConnectButton } from "@/comp/ConnectButton";
 import { formatNumber } from "@/lib/util";
+import { useChainContracts } from "@/hook/wallet";
 import { APPKIT_WAGMI } from "@/cfg";
-
-import Contracts from '@/../chain/contracts'
 
 interface FundData {
   worker: `0x${string}`;
@@ -40,32 +38,28 @@ export default function FundPage({
   const { address: fundAddress } = use(params);
   assertValidAddress(fundAddress);
 
-  const { address: walletAddress, isConnected, caipAddress } = useAppKitAccount();
+  const chainContracts = useChainContracts();
   const [fundData, setFundData] = useState<FundData | undefined>(undefined);
   const [tokenData, setTokenData] = useState<TokenData | undefined>(undefined);
 
-  const ChainContracts = useMemo<Record<string, any> | undefined>(() => (
-    !isConnected ? undefined : Contracts[caipAddress.split(':')?.[1]]
-  ), [isConnected, caipAddress]);
-
   useEffect(() => {
-    if (isConnected) {
+    if (!!chainContracts) {
       Promise.all([
         readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundAddress,
-          abi: ChainContracts.Fund.abi,
+          abi: chainContracts.Fund.abi,
           functionName: 'worker',
           args: [],
         }),
         readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundAddress,
-          abi: ChainContracts.Fund.abi,
+          abi: chainContracts.Fund.abi,
           functionName: 'oracle',
           args: [],
         }),
         readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundAddress,
-          abi: ChainContracts.Fund.abi,
+          abi: chainContracts.Fund.abi,
           functionName: 'payoutToken',
           args: [],
         }),
@@ -75,32 +69,32 @@ export default function FundPage({
         console.log(error);
       });
     }
-  }, [fundAddress, isConnected]);
+  }, [fundAddress, chainContracts]);
 
   useEffect(() => {
-    if (isConnected && !!fundData) {
+    if (!!chainContracts && !!fundData) {
       Promise.all([
         readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundData.token,
-          abi: ChainContracts.FundToken.abi,
+          abi: chainContracts.FundToken.abi,
           functionName: 'name',
           args: [],
         }),
         readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundData.token,
-          abi: ChainContracts.FundToken.abi,
+          abi: chainContracts.FundToken.abi,
           functionName: 'symbol',
           args: [],
         }),
         readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundData.token,
-          abi: ChainContracts.FundToken.abi,
+          abi: chainContracts.FundToken.abi,
           functionName: 'balanceOf',
           args: [fundAddress],
         }),
         readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundData.token,
-          abi: ChainContracts.FundToken.abi,
+          abi: chainContracts.FundToken.abi,
           functionName: 'decimals',
           args: [],
         }),
@@ -110,12 +104,11 @@ export default function FundPage({
         console.log(error);
       });
     }
-  }, [fundAddress, fundData]);
+  }, [chainContracts, fundAddress, fundData]);
 
   return (
     <div className="flex flex-col gap-y-4">
-      <h1>Fund @ <Address address={fundAddress} /></h1>
-      <ConnectButton />
+      <h2>Fund @ <Address address={fundAddress} /></h2>
       <div>
         {(fundData === undefined) ? (
           <span>Loading...</span>
