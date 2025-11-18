@@ -43,10 +43,10 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   ERC20Permit public payoutToken;
   /// @notice The IPFS CID of the JSON file with the terms of the work
   bytes32 public termsCID;
+  /// @notice The nonce for the next withdrawal
+  uint8 public nonce;
   /// @notice The total amount of value withdrawn from this fund
   uint256 private _withdrawn;
-  /// @notice The nonce for the next withdrawal
-  uint8 private _nonce;
 
   /// @notice A local record of the funds deposited into this contract (by ERC20, funder)
   mapping(ERC20Permit => mapping(address => uint256)) private _treasury;
@@ -144,8 +144,9 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @param token The ERC20 token to be deposited
   /// @param funder The address of the account that will be depositing
   /// @param amount The amount of the given token that will deposited
+  /// @param deadline The last permitted block time for the signed deposit (as a Unix epoch value)
   /// @param funderSignature An ERC20Permit signature from {funder} authorizing {amount} of {token} to be transferred
-  function deposit(ERC20Permit token, address funder, uint256 amount, bytes memory funderSignature)
+  function deposit(ERC20Permit token, address funder, uint256 amount, uint256 deadline, bytes memory funderSignature)
       public afterLocked {
     // TODO: Remove
     require(token == payoutToken, "Only deposits in the contract's payout token are currently accepted");
@@ -161,7 +162,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
 
     // TODO: Almost certainly need to use a passed-in timestamp so that the user doesn't need
     // to guess the timestamp of the submission block for this operation
-    token.permit(funder, address(this), amount, block.timestamp, v, r, s);
+    token.permit(funder, address(this), amount, deadline, v, r, s);
     token.transferFrom(funder, address(this), amount);
 
     if (!_treasuryTokenMap[token]) {
@@ -196,7 +197,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
     payoutToken.transfer(owner(), amount - oracleAmount);
     payoutToken.transfer(oracle, oracleAmount);
     _withdrawn += amount;
-    _nonce++;
+    nonce++;
 
     emit Withdrawal(amount);
   }
@@ -208,6 +209,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
     // TODO: Any per-token remainder should be sent to the oracle
     uint256 fundsRegistered_ = fundsRegistered();
     uint256 fundsRemaining = (fundsRegistered_ - _withdrawn);
+    require(fundsRemaining > 0, "Must refund a non-zero sum");
 
     uint256 fundsRefunded = 0;
     for (uint256 i = 0; i < treasuryTokens.length; i++) {
@@ -263,7 +265,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @param amount The amount of {payoutToken} that will be withdrawn
   /// @return hash The EIP-712 'Withdraw' payload that can be signed by the {oracle} to authorize a withdrawal
   function hashWithdraw(uint256 amount) public view returns (bytes32 hash) {
-    bytes32 structHash = keccak256(abi.encode(_WITHDRAW_TYPEHASH, address(this), amount, _nonce));
+    bytes32 structHash = keccak256(abi.encode(_WITHDRAW_TYPEHASH, address(this), amount, nonce));
     return _hashTypedDataV4(structHash);
   }
 

@@ -93,13 +93,13 @@ contract FundTest is FundBaseTest {
   }
 
   function test_deposit_success() public locked {
-    bytes32 permitHash = _fundToken.hashPermit(_funder(), address(_fund()), DEPO_AMOUNT, block.timestamp);
+    bytes32 permitHash = _fundToken.hashPermit(_funder(), address(_fund()), DEPO_AMOUNT, BLOCK_PERMIT_TIME);
     bytes memory funderDepositSignature = _signAsRaw(_funder(), permitHash);
 
     vm.prank(_funder());
     vm.expectEmit();
     emit IFund.Deposit(_fundToken, _funder(), DEPO_AMOUNT);
-    _fund().deposit(_fundToken, _funder(), DEPO_AMOUNT, funderDepositSignature);
+    _fund().deposit(_fundToken, _funder(), DEPO_AMOUNT, BLOCK_PERMIT_TIME, funderDepositSignature);
 
     assertEq(_fundToken.balanceOf(_funder()), FUNDER_BASE_AMOUNT - DEPO_AMOUNT);
     assertEq(_fund().funds(), DEPO_AMOUNT);
@@ -108,7 +108,7 @@ contract FundTest is FundBaseTest {
   function test_deposit_badPermit() public locked {
     bytes memory funderDepositSignature = _signAsRaw(_funder(), BAD_TERMS);
     vm.expectRevert();
-    _fund().deposit(_fundToken, _funder(), DEPO_AMOUNT, funderDepositSignature);
+    _fund().deposit(_fundToken, _funder(), DEPO_AMOUNT, BLOCK_PERMIT_TIME, funderDepositSignature);
   }
 
   function test_withdraw_success() public locked fundedBy(1) {

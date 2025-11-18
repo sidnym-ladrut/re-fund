@@ -20,6 +20,8 @@ abstract contract FundBaseTest is Test {
   uint256 private constant _FUNDER_BASE_PK = 30;
   uint256 public constant PERROLE_COUNT = 5;
 
+  uint256 public constant BLOCK_START_TIME = 1e7;
+  uint256 public constant BLOCK_PERMIT_TIME = BLOCK_START_TIME + 1e2;
   uint256 public constant FUND_CUT = 1e3; // 10%
   uint256 public constant FUNDER_BASE_AMOUNT = 1e3 * 10 ** FUND_TOKEN_DECIMALS;
   uint256 public constant DEPO_AMOUNT = 1e1 * 10 ** FUND_TOKEN_DECIMALS;
@@ -45,6 +47,7 @@ abstract contract FundBaseTest is Test {
   ///////////////
 
   function setUp() public virtual {
+    vm.warp(BLOCK_START_TIME);
     _launcher = _register(_LAUNCHER_PK);
     for (uint256 i = 0; i < PERROLE_COUNT; i++) {
       _workers.push(_register(_WORKER_BASE_PK + i));
@@ -67,10 +70,10 @@ abstract contract FundBaseTest is Test {
   }
 
   function _fundAs(Fund fund, address funder, uint256 amount) internal {
-    bytes32 hashPermit = _fundToken.hashPermit(funder, address(fund), amount, block.timestamp);
+    bytes32 hashPermit = _fundToken.hashPermit(funder, address(fund), amount, BLOCK_PERMIT_TIME);
     bytes memory signature = _signAsRaw(funder, hashPermit);
     vm.prank(funder);
-    fund.deposit(_fundToken, funder, amount, signature);
+    fund.deposit(_fundToken, funder, amount, BLOCK_PERMIT_TIME, signature);
   }
 
   function _signAs191(address addr, bytes32 data) internal view returns (bytes memory signature) {

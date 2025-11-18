@@ -22,6 +22,13 @@ const config: HardhatUserConfig = {
       },
     },
   },
+  ignition: {
+    strategyConfig: {
+      create2: {
+        salt: "0x0000000000000000000000000000000000000000000000000000000000000000",
+      },
+    },
+  },
   networks: {
     hardhat: {
       type: "edr-simulated",
