@@ -1,19 +1,22 @@
 import { network } from "hardhat";
-import { encodeAbiParameters, parseAbiParameters } from "viem";
+import { getAddress, encodeAbiParameters, parseAbiParameters } from "viem";
 import FundFactory from "../ignition/modules/FundFactory.ts";
 import FundToken from "../ignition/modules/FundToken.ts";
 
 const FUND_TERMS: string = `0x${'0'.repeat(64)}`;
-const FUND_TOKEN_DRIP: BigInt = 1000000n;
+const FUND_TOKEN_DRIP: bigint = 1000000n;
 
 async function main() {
   const { ignition, viem } = await network.connect();
-  const { fundImplementation, fundFactory } = await ignition.deploy(FundFactory);
-  const { fundToken } = await ignition.deploy(FundToken);
-
   const publicClient = await viem.getPublicClient();
   const walletClient = await viem.getWalletClient();
   const [deployer, ...accounts] = await walletClient.getAddresses();
+
+  // FIXME: `create2` just doesn't seem to work when using ignition scripts...
+  // const deployArgs = { defaultSender: getAddress(deployer), strategy: 'create2' };
+  const deployArgs = {};
+  const { fundImplementation, fundFactory } = await ignition.deploy(FundFactory, deployArgs);
+  const { fundToken } = await ignition.deploy(FundToken, deployArgs);
 
   {
     console.log(`Distributing test tokens...`);
@@ -23,7 +26,7 @@ async function main() {
         abi: fundToken.abi,
         functionName: "balanceOf",
         args: [account],
-      })) as BigInt;
+      })) as bigint;
 
       if (accountBalance === 0n) {
         const hash = await walletClient.writeContract({
