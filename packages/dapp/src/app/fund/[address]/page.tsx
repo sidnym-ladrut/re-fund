@@ -8,7 +8,7 @@ import { parseUnits, formatUnits } from 'viem'
 import type { Provider } from "@reown/appkit/react";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { Address } from "@/comp/Address";
-import { formatNumber } from "@/lib/util";
+import { formatNumber, nextPermitTime } from "@/lib/util";
 import { useChainContracts } from "@/hook/wallet";
 import { simulateContract, writeContract } from '@wagmi/core'
 import { APPKIT_WAGMI } from "@/cfg";
@@ -42,7 +42,7 @@ export default function FundPage({
   const { address: fundAddress } = use(params);
   assertValidAddress(fundAddress);
 
-  const { address: walletAddress, isConnected } = useAppKitAccount();
+  const { address: walletAddress, isConnected, caipAddress } = useAppKitAccount();
   const { signMessageAsync: signMessage } = useSignMessage();
   const { signTypedDataAsync: signData } = useSignTypedData();
   const chainContracts = useChainContracts();
@@ -51,6 +51,10 @@ export default function FundPage({
   const [oracleSign, setOracleSign] = useState<string>("");
   const [funderDepo, setFunderDepo] = useState<string>("");
   const [workerWith, setWorkerWith] = useState<string>("");
+
+  const chainId: number = useMemo(() => (
+    Number(caipAddress?.split(':')?.[1] ?? 0)
+  ), [caipAddress]);
 
   const signOff = useCallback(() => {
     const signOffFun = async () => {
@@ -84,9 +88,8 @@ export default function FundPage({
       }
 
       try {
+        const depoTime: bigint = nextPermitTime();
         const depoAmount: bigint = parseUnits(funderDepo, Number(tokenData.decimals));
-        const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour from now
-        
         const depoNonce: bigint = (await readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundData.token,
           abi: chainContracts.FundToken.abi,
@@ -94,20 +97,12 @@ export default function FundPage({
           args: [walletAddress],
         })) as bigint;
 
-        // Get token name and version for EIP-712 domain
-        const tokenName = await readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundData.token,
-          abi: chainContracts.FundToken.abi,
-          functionName: 'name',
-          args: [],
-        }) as string;
-
         const signature = await signData({
           account: walletAddress as `0x${string}`,
           domain: {
-            name: tokenName,
+            name: tokenData.name,
             version: '1',
-            chainId: await APPKIT_WAGMI.wagmiConfig.getClient().getChainId(),
+            chainId: chainId,
             verifyingContract: fundData.token,
           },
           types: {
@@ -125,7 +120,7 @@ export default function FundPage({
             spender: fundAddress,
             value: depoAmount,
             nonce: depoNonce,
-            deadline: deadline,
+            deadline: depoTime,
           },
         });
 
@@ -133,7 +128,7 @@ export default function FundPage({
           address: fundAddress,
           abi: chainContracts.Fund.abi,
           functionName: 'deposit',
-          args: [fundData.token, walletAddress as `0x${string}`, depoAmount, deadline, signature],
+          args: [fundData.token, walletAddress as `0x${string}`, depoAmount, depoTime, signature],
         });
         
         const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
@@ -145,7 +140,7 @@ export default function FundPage({
       }
     };
     depositFun();
-  }, [walletAddress, funderDepo, fundData, tokenData, chainContracts, signData, fundAddress]);
+  }, [walletAddress, chainId, funderDepo, fundData, tokenData, chainContracts, signData, fundAddress]);
   const signWithdrawal = useCallback(() => {
     const signWithdrawalFun = async () => {
       if (!chainContracts || !tokenData || !walletAddress) {
@@ -167,7 +162,7 @@ export default function FundPage({
           domain: {
             name: 'Fund',
             version: '1',
-            chainId: 31337, // Hardhat local network
+            chainId: chainId,
             verifyingContract: fundAddress,
           },
           types: {
@@ -194,7 +189,7 @@ export default function FundPage({
       }
     };
     signWithdrawalFun();
-  }, [walletAddress, workerWith, tokenData, chainContracts, fundAddress, signData]);
+  }, [walletAddress, chainId, workerWith, tokenData, chainContracts, fundAddress, signData]);
   const execWithdrawal = useCallback(() => {
     const execWithdrawalFun = async () => {
       if (!chainContracts || !tokenData || !oracleSign) {
@@ -222,7 +217,7 @@ export default function FundPage({
       }
     };
     execWithdrawalFun();
-  }, [chainContracts, tokenData, workerWith, oracleSign, fundAddress]);
+  }, [chainContracts, chainId, tokenData, workerWith, oracleSign, fundAddress]);
   const refund = useCallback(() => {
     const refundFun = async () => {
       if (!chainContracts) {
