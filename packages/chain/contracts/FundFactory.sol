@@ -57,7 +57,7 @@ contract FundFactory {
   /// @param salt A salt value to allow multiple contracts with the same arguments to be generated
   /// @return proxy The address of the generated proxy contract
   function deploy(bytes calldata args, bytes32 salt) public returns (address proxy) {
-    bytes32 hash = bytes32(uint256(keccak256(args)) + uint256(salt));
+    bytes32 hash = bytes32(uint256(keccak256(args)) ^ uint256(salt));
     proxy = Clones.cloneDeterministic(address(FUND_IMPLEMENTATION), hash);
     IFund(proxy).initialize(args);
 

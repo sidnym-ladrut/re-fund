@@ -17,11 +17,9 @@ interface Fund {
   worker: `0x${string}`;
   oracle: `0x${string}`;
   token: `0x${string}`;
-  termsCID: string;
   oracleCut: bigint;
   isLocked: boolean;
   fundsAvailable: bigint;
-  fundsRegistered: bigint;
 }
 
 export default function OracleDashboard() {
@@ -45,35 +43,16 @@ export default function OracleDashboard() {
 
   const loadOracleFunds = async () => {
     if (!ChainContracts || !walletAddress) return;
-    
+
     setIsLoading(true);
     try {
-      // Get all funds and filter by oracle since the deployed contract has the old interface
-      const allFunds = await readContract(APPKIT_WAGMI.wagmiConfig, {
+      // Filter funds where this wallet is the oracle
+      const oracleFunds: `0x${string}`[] = await readContract(APPKIT_WAGMI.wagmiConfig, {
         address: ChainContracts.FundFactory.address,
         abi: ChainContracts.FundFactory.abi,
         functionName: 'instances',
-        args: [],
+        args: [walletAddress, 1],
       }) as `0x${string}`[];
-
-      // Filter funds where this wallet is the oracle
-      const oracleFunds: `0x${string}`[] = [];
-      for (const fundAddress of allFunds) {
-        try {
-          const oracle = await readContract(APPKIT_WAGMI.wagmiConfig, {
-            address: fundAddress,
-            abi: ChainContracts.Fund.abi,
-            functionName: 'oracle',
-            args: [],
-          }) as `0x${string}`;
-          
-          if (oracle.toLowerCase() === walletAddress.toLowerCase()) {
-            oracleFunds.push(fundAddress);
-          }
-        } catch (error) {
-          console.warn(`Failed to check oracle for fund ${fundAddress}:`, error);
-        }
-      }
 
       console.log('Found oracle funds:', oracleFunds);
 
@@ -81,7 +60,7 @@ export default function OracleDashboard() {
       const fundDetails = await Promise.all(
         oracleFunds.map(async (fundAddress) => {
           try {
-            const [worker, oracle, token, termsCID, oracleCut, termsSignature, fundsAvailable, fundsRegistered] = await Promise.all([
+            const [worker, oracle, token, oracleCut, termsSignature, fundsAvailable] = await Promise.all([
               readContract(APPKIT_WAGMI.wagmiConfig, {
                 address: fundAddress,
                 abi: ChainContracts.Fund.abi,
@@ -103,12 +82,6 @@ export default function OracleDashboard() {
               readContract(APPKIT_WAGMI.wagmiConfig, {
                 address: fundAddress,
                 abi: ChainContracts.Fund.abi,
-                functionName: 'termsCID',
-                args: [],
-              }) as Promise<string>,
-              readContract(APPKIT_WAGMI.wagmiConfig, {
-                address: fundAddress,
-                abi: ChainContracts.Fund.abi,
                 functionName: 'oracleCut',
                 args: [],
               }) as Promise<bigint>,
@@ -124,12 +97,6 @@ export default function OracleDashboard() {
                 functionName: 'fundsAvailable',
                 args: [],
               }) as Promise<bigint>,
-              readContract(APPKIT_WAGMI.wagmiConfig, {
-                address: fundAddress,
-                abi: ChainContracts.Fund.abi,
-                functionName: 'fundsRegistered',
-                args: [],
-              }) as Promise<bigint>,
             ]);
 
             const isLocked = termsSignature && termsSignature !== '0x';
@@ -139,11 +106,9 @@ export default function OracleDashboard() {
               worker,
               oracle,
               token,
-              termsCID,
               oracleCut,
               isLocked,
               fundsAvailable,
-              fundsRegistered,
             };
           } catch (error) {
             console.error(`Error loading fund details for ${fundAddress}:`, error);
@@ -153,14 +118,14 @@ export default function OracleDashboard() {
       );
 
       const validFunds = fundDetails.filter((fund): fund is Fund => fund !== null);
-      
+
       // Separate pending (not locked) from active (locked) funds
       const pending = validFunds.filter(fund => !fund.isLocked);
       const active = validFunds.filter(fund => fund.isLocked);
-      
+
       setPendingFunds(pending);
       setActiveFunds(active);
-      
+
       console.log('Pending funds:', pending);
       console.log('Active funds:', active);
     } catch (error) {
@@ -217,7 +182,7 @@ export default function OracleDashboard() {
         ) : (
           <div className="grid md:grid-cols-2 gap-6">
             {pendingFunds.map((fund) => (
-              <Card 
+              <Card
                 key={fund.address}
                 onClick={() => router.push(`/fund/${fund.address}`)}
                 className="hover:border-black cursor-pointer"
@@ -238,7 +203,7 @@ export default function OracleDashboard() {
                     <h4 className="text-sm text-gray-500">Your Cut</h4>
                     <p className="text-lg font-semibold">{formatNumber((Number(fund.oracleCut) / 100).toString())}%</p>
                   </div>
-                  <button 
+                  <button
                     onClick={(e) => {
                       e.stopPropagation();
                       router.push(`/fund/${fund.address}`);
@@ -266,7 +231,7 @@ export default function OracleDashboard() {
         ) : (
           <div className="grid md:grid-cols-2 gap-6">
             {activeFunds.map((fund) => (
-              <Card 
+              <Card
                 key={fund.address}
                 onClick={() => router.push(`/fund/${fund.address}`)}
                 className="hover:border-black cursor-pointer"

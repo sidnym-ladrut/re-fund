@@ -27,7 +27,7 @@ export default async function RootLayout({
           </main>
           <footer className="bg-gray-50 border-t-2 border-gray-200 py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-600">
-              <p>&copy; 2025 re-fund. Built with ❤️ for decentralized crowdfunding.</p>
+              <p>Built for EncodeClub EVM Bootcamp 25Q3 T1</p>
             </div>
           </footer>
         </ContextProvider>

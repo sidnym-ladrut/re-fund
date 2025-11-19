@@ -44,35 +44,16 @@ export default function WorkerDashboard() {
 
   const loadWorkerFunds = async () => {
     if (!ChainContracts || !walletAddress) return;
-    
+
     setIsLoading(true);
     try {
-      // Get all funds and filter by worker since the deployed contract has the old interface
-      const allFunds = await readContract(APPKIT_WAGMI.wagmiConfig, {
+      // Filter funds where this wallet is the worker
+      const workerFunds: `0x${string}`[] = await readContract(APPKIT_WAGMI.wagmiConfig, {
         address: ChainContracts.FundFactory.address,
         abi: ChainContracts.FundFactory.abi,
         functionName: 'instances',
-        args: [],
+        args: [walletAddress, 0],
       }) as `0x${string}`[];
-
-      // Filter funds where this wallet is the worker
-      const workerFunds: `0x${string}`[] = [];
-      for (const fundAddress of allFunds) {
-        try {
-          const worker = await readContract(APPKIT_WAGMI.wagmiConfig, {
-            address: fundAddress,
-            abi: ChainContracts.Fund.abi,
-            functionName: 'worker',
-            args: [],
-          }) as `0x${string}`;
-          
-          if (worker.toLowerCase() === walletAddress.toLowerCase()) {
-            workerFunds.push(fundAddress);
-          }
-        } catch (error) {
-          console.warn(`Failed to check worker for fund ${fundAddress}:`, error);
-        }
-      }
 
       console.log('Found worker funds:', workerFunds);
 
@@ -148,7 +129,7 @@ export default function WorkerDashboard() {
           <h1 className="mb-2">Worker Dashboard</h1>
           <p className="text-gray-600">Manage your crowdfunding campaigns</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowCreateModal(true)}
           className="bg-black text-white px-6 py-3 rounded-md hover:bg-gray-800"
         >
@@ -181,7 +162,7 @@ export default function WorkerDashboard() {
           <Card>
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">You haven't created any funds yet</p>
-              <button 
+              <button
                 onClick={() => setShowCreateModal(true)}
                 className="link-button"
               >
@@ -192,10 +173,10 @@ export default function WorkerDashboard() {
         ) : (
           <div className="grid md:grid-cols-2 gap-6">
             {funds.map((fund) => (
-              <Card 
+              <Card
                 key={fund.address}
-                onClick={fund.isLocked ? undefined : () => router.push(`/fund/${fund.address}`)}
-                className={fund.isLocked ? "opacity-75" : "hover:border-black cursor-pointer"}
+                onClick={() => router.push(`/fund/${fund.address}`)}
+                className="hover:border-black cursor-pointer"
               >
                 <div className="space-y-3">
                   <div className="flex justify-between items-start">
@@ -203,7 +184,7 @@ export default function WorkerDashboard() {
                       <h4 className="text-sm text-gray-500">Fund Address</h4>
                       <Address address={fund.address} />
                     </div>
-                    <StatusBadge status={fund.isLocked ? 'locked' : 'unlocked'} />
+                    <StatusBadge status={fund.isLocked ? 'locked' : 'pending'} />
                   </div>
                   <div>
                     <h4 className="text-sm text-gray-500">Oracle</h4>
@@ -289,31 +270,26 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
         throw new Error('Oracle cut must be between 0 and 100%');
       }
 
-      // Convert terms to bytes32 (simplified - in production, upload to IPFS first)
-      // Hash the terms text to create a bytes32 CID
-      const encoder = new TextEncoder();
-      const data = encoder.encode(formData.terms);
-      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-      const hashArray = Array.from(new Uint8Array(hashBuffer));
-      const termsCID = '0x' + hashArray.map(b => b.toString(16).padStart(2, '0')).join('') as `0x${string}`;
+      // FIXME: Upload to IPFS and get Content ID
+      const terms = formData.terms;
 
       console.log('Creating fund with:', {
         worker: walletAddress,
         oracle: formData.oracle,
         oracleCut: oracleCutBps,
         token: formData.token,
-        terms: termsCID,
+        terms: terms,
       });
 
       // Encode the initialization parameters (worker is the connected wallet)
       const fundArgs = encodeAbiParameters(
-        parseAbiParameters('address worker, address oracle, uint256 cut, address token, bytes32 terms'),
+        parseAbiParameters('address worker, address oracle, uint256 cut, address token, string terms'),
         [
           walletAddress as `0x${string}`,
           formData.oracle as `0x${string}`,
           BigInt(oracleCutBps),
           formData.token as `0x${string}`,
-          termsCID as `0x${string}`,
+          terms as string,
         ]
       );
 
@@ -323,11 +299,11 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
         address: ChainContracts.FundFactory.address,
         abi: ChainContracts.FundFactory.abi,
         functionName: 'deploy',
-        args: [fundArgs, salt],
+        args: [fundArgs],
       });
 
       console.log('Transaction simulated successfully, deploying...');
-      
+
       const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
 
       console.log('Transaction submitted:', hash);
@@ -361,15 +337,25 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
 
       <div>
         <label className="block text-sm font-medium mb-2">Oracle Address</label>
-        <input
-          type="text"
-          value={formData.oracle}
-          onChange={(e) => setFormData({ ...formData, oracle: e.target.value })}
-          placeholder="0x..."
-          className="w-full px-4 py-2 border-2 border-gray-300 rounded-md focus:border-black outline-none"
-          required
-          disabled={isSubmitting}
-        />
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={formData.oracle}
+            onChange={(e) => setFormData({ ...formData, oracle: e.target.value })}
+            placeholder="0x..."
+            className="w-full px-4 py-2 border-2 border-gray-300 rounded-md focus:border-black outline-none"
+            required
+            disabled={isSubmitting}
+          />
+          <button
+            type="button"
+            onClick={() => setFormData({ ...formData, oracle: walletAddress, oracleCut: '0' })}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 whitespace-nowrap text-sm"
+            disabled={isSubmitting}
+          >
+            Use Current Wallet
+          </button>
+        </div>
         <p className="text-sm text-gray-500 mt-1">The address that will review and approve your work</p>
       </div>
 
@@ -436,8 +422,8 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div className="flex gap-4 pt-4">
-        <button 
-          type="submit" 
+        <button
+          type="submit"
           className="flex-1 bg-black text-white py-3 rounded-md hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed"
           disabled={isSubmitting}
         >

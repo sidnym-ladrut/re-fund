@@ -1,9 +1,9 @@
 import { network } from "hardhat";
-import { getAddress, encodeAbiParameters, parseAbiParameters } from "viem";
+import { getAddress, encodeAbiParameters, parseAbiParameters, keccak256 } from "viem";
 import FundFactory from "../ignition/modules/FundFactory.ts";
 import FundToken from "../ignition/modules/FundToken.ts";
 
-const FUND_TERMS: string = `0x${'0'.repeat(64)}`;
+const FUND_TERMS: string = "bafkreigjokjc775uq75cv4n4wjsy4uofgwb3c7mi7epkpci2x6b26f3is4";
 const FUND_TOKEN_DRIP: bigint = 1000000n;
 
 async function main() {
@@ -11,6 +11,7 @@ async function main() {
   const publicClient = await viem.getPublicClient();
   const walletClient = await viem.getWalletClient();
   const [deployer, ...accounts] = await walletClient.getAddresses();
+  const chainId = await publicClient.getChainId();
 
   // FIXME: `create2` just doesn't seem to work when using ignition scripts...
   // const deployArgs = { defaultSender: getAddress(deployer), strategy: 'create2' };
@@ -53,7 +54,7 @@ async function main() {
 
     if (existingFunds.length === 0) {
       const fundInitArgs = encodeAbiParameters(
-        parseAbiParameters('address worker, address oracle, uint256 cut, address token, bytes32 terms'),
+        parseAbiParameters('address worker, address oracle, uint256 cut, address token, string terms'),
         [deployer, deployer, 0, fundToken.address, FUND_TERMS],
       );
       const { request, result } = await publicClient.simulateContract({
@@ -76,9 +77,23 @@ async function main() {
       args: [],
     })) as string;
     if (fundSignature === "0x") {
-      const termsSign = await walletClient.signMessage({
+      const termsSign = await walletClient.signTypedData({
         account: deployer,
-        message: { raw: FUND_TERMS },
+        domain: {
+          name: 'Fund',
+          version: '1',
+          chainId: chainId,
+          verifyingContract: existingFunds[0],
+        },
+        types: {
+          SignTerms: [
+            { name: 'terms', type: 'bytes32' },
+          ],
+        },
+        primaryType: 'SignTerms',
+        message: {
+          terms: keccak256(FUND_TERMS),
+        },
       });
       const hash = await walletClient.writeContract({
         account: deployer,
