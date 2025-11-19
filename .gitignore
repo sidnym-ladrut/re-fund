@@ -16,3 +16,7 @@ node_modules
 
 # cli
 dist
+
+# documentation (work in progress)
+docs/chain/
+docs/frontend/

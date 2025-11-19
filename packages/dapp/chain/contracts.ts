@@ -1,6 +1,6 @@
 const CONTRACTS = {31337:{
   "Fund": {
-    "address": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+    "address": "0x6610B02e6DfFfF3FdB6Fb7117806263f449A237b",
     "abi": [
       {
         "inputs": [],
@@ -152,11 +152,6 @@ const CONTRACTS = {31337:{
             "type": "uint256"
           },
           {
-            "internalType": "uint256",
-            "name": "deadline",
-            "type": "uint256"
-          },
-          {
             "internalType": "bytes",
             "name": "funderSignature",
             "type": "bytes"
@@ -292,19 +287,6 @@ const CONTRACTS = {31337:{
         "name": "lockTerms",
         "outputs": [],
         "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "nonce",
-        "outputs": [
-          {
-            "internalType": "uint8",
-            "name": "",
-            "type": "uint8"
-          }
-        ],
-        "stateMutability": "view",
         "type": "function"
       },
       {
@@ -453,6 +435,11 @@ const CONTRACTS = {31337:{
       {
         "inputs": [
           {
+            "internalType": "address",
+            "name": "oracle_",
+            "type": "address"
+          },
+          {
             "internalType": "uint256",
             "name": "cut",
             "type": "uint256"
@@ -508,7 +495,7 @@ const CONTRACTS = {31337:{
     "inheritedFunctions": {}
   },
   "FundFactory": {
-    "address": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+    "address": "0x2279B7A0a67DB372996a5FaB50D91eAA73d2eBe6",
     "abi": [
       {
         "inputs": [
@@ -549,12 +536,6 @@ const CONTRACTS = {31337:{
             "indexed": true,
             "internalType": "address",
             "name": "worker",
-            "type": "address"
-          },
-          {
-            "indexed": true,
-            "internalType": "address",
-            "name": "oracle",
             "type": "address"
           }
         ],
@@ -618,6 +599,25 @@ const CONTRACTS = {31337:{
         "type": "function"
       },
       {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          }
+        ],
+        "name": "instances",
+        "outputs": [
+          {
+            "internalType": "address[]",
+            "name": "",
+            "type": "address[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
         "inputs": [],
         "name": "instances",
         "outputs": [
@@ -648,36 +648,12 @@ const CONTRACTS = {31337:{
         ],
         "stateMutability": "view",
         "type": "function"
-      },
-      {
-        "inputs": [
-          {
-            "internalType": "address",
-            "name": "account",
-            "type": "address"
-          },
-          {
-            "internalType": "enum IFund.Role",
-            "name": "role",
-            "type": "uint8"
-          }
-        ],
-        "name": "instances",
-        "outputs": [
-          {
-            "internalType": "address[]",
-            "name": "",
-            "type": "address[]"
-          }
-        ],
-        "stateMutability": "view",
-        "type": "function"
       }
     ],
     "inheritedFunctions": {}
   },
   "FundToken": {
-    "address": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+    "address": "0x8A791620dd6260079BF849Dc5567aDC3F2FdC318",
     "abi": [
       {
         "inputs": [],
@@ -942,7 +918,7 @@ const CONTRACTS = {31337:{
         "outputs": [
           {
             "internalType": "uint256",
-            "name": "",
+            "name": "amount",
             "type": "uint256"
           }
         ],
