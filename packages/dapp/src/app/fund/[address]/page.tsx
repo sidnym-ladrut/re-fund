@@ -1,5 +1,5 @@
 'use client'
-import { use, useState, useEffect, useMemo, useCallback } from 'react'
+import { use, useState, useEffect, useMemo, useCallback, ChangeEvent } from 'react'
 import { notFound } from 'next/navigation'
 import { readContract } from '@wagmi/core'
 import { useSignMessage, useSignTypedData } from 'wagmi'
@@ -58,7 +58,9 @@ export default function FundPage({
         account: walletAddress,
         message: { raw: fundData?.terms },
       });
-      prompt("Signed! Please send this to the worker:", signature);
+      // Auto-fill the signature input field
+      setOracleSign(signature);
+      alert("Signature generated and filled! The worker can now click 'Lock In' to activate the fund.");
     };
     signOffFun();
   }, [walletAddress, fundData, chainContracts, signMessage]);
@@ -76,91 +78,179 @@ export default function FundPage({
   }, [oracleSign, chainContracts]);
   const deposit = useCallback(() => {
     const depositFun = async () => {
-      const depoAmount: bigint = parseUnits(funderDepo, tokenData.decimals);
-      const depoNonce: bigint = (await readContract(APPKIT_WAGMI.wagmiConfig, {
-        address: fundData.token,
-        abi: chainContracts.FundToken.abi,
-        functionName: 'nonces',
-        args: [walletAddress],
-      })) as bigint;
-      const signature = await signData({
-        account: walletAddress,
-        types: {
-          Permit: [
-            { name: 'owner', type: 'address' },
-            { name: 'spender', type: 'address' },
-            { name: 'value', type: 'uint256' },
-            { name: 'nonce', type: 'uint256' },
-            { name: 'deadline', type: 'uint256' },
-          ],
-        },
-        primaryType: 'Permit',
-        message: {
-          owner: walletAddress,
-          spender: fundAddress,
-          value: depoAmount,
-          nonce: depoNonce,
-          deadline: Date.now(), // FIXME
-        },
-      });
-      console.log(signature);
-      // const { request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
-      //   address: fundAddress,
-      //   abi: chainContracts.Fund.abi,
-      //   functionName: 'deposit',
-      //   args: [fundData.token, walletAddress, depoAmount, signature],
-      // });
-      // const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+      if (!chainContracts || !fundData || !tokenData || !walletAddress) {
+        alert('Please ensure wallet is connected and data is loaded');
+        return;
+      }
+
+      try {
+        const depoAmount: bigint = parseUnits(funderDepo, Number(tokenData.decimals));
+        const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600); // 1 hour from now
+        
+        const depoNonce: bigint = (await readContract(APPKIT_WAGMI.wagmiConfig, {
+          address: fundData.token,
+          abi: chainContracts.FundToken.abi,
+          functionName: 'nonces',
+          args: [walletAddress],
+        })) as bigint;
+
+        // Get token name and version for EIP-712 domain
+        const tokenName = await readContract(APPKIT_WAGMI.wagmiConfig, {
+          address: fundData.token,
+          abi: chainContracts.FundToken.abi,
+          functionName: 'name',
+          args: [],
+        }) as string;
+
+        const signature = await signData({
+          account: walletAddress as `0x${string}`,
+          domain: {
+            name: tokenName,
+            version: '1',
+            chainId: await APPKIT_WAGMI.wagmiConfig.getClient().getChainId(),
+            verifyingContract: fundData.token,
+          },
+          types: {
+            Permit: [
+              { name: 'owner', type: 'address' },
+              { name: 'spender', type: 'address' },
+              { name: 'value', type: 'uint256' },
+              { name: 'nonce', type: 'uint256' },
+              { name: 'deadline', type: 'uint256' },
+            ],
+          },
+          primaryType: 'Permit',
+          message: {
+            owner: walletAddress as `0x${string}`,
+            spender: fundAddress,
+            value: depoAmount,
+            nonce: depoNonce,
+            deadline: deadline,
+          },
+        });
+
+        const { request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
+          address: fundAddress,
+          abi: chainContracts.Fund.abi,
+          functionName: 'deposit',
+          args: [fundData.token, walletAddress as `0x${string}`, depoAmount, deadline, signature],
+        });
+        
+        const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+        alert(`Deposit successful! Transaction: ${hash}`);
+        setFunderDepo(''); // Clear input
+      } catch (error: any) {
+        console.error('Deposit error:', error);
+        alert(`Deposit failed: ${error.message || 'Unknown error'}`);
+      }
     };
     depositFun();
-  }, [walletAddress, funderDepo, fundData, tokenData, chainContracts, signMessage]);
+  }, [walletAddress, funderDepo, fundData, tokenData, chainContracts, signData, fundAddress]);
   const signWithdrawal = useCallback(() => {
     const signWithdrawalFun = async () => {
-      const withAmount: bigint = parseUnits(workerWith, tokenData.decimals);
-      const nonce = await readContract(APPKIT_WAGMI.wagmiConfig, {
-        address: fundAddress,
-        abi: chainContracts.Fund.abi,
-        functionName: 'nonce',
-        args: [],
-      });
-      const signature = await signData({
-        account: walletAddress,
-        types: {
-          Withdraw: [
-            { name: 'fund', type: 'address' },
-            { name: 'amount', type: 'uint256' },
-            { name: 'nonce', type: 'uint256' },
-          ],
-        },
-        primaryType: 'Withdraw',
-        message: {
-          fund: fundAddress,
-          amount: withAmount,
-          nonce: nonce,
-        },
-      });
-      prompt("Signed! Please send this to the worker:", signature);
+      if (!chainContracts || !tokenData || !walletAddress) {
+        alert('Please ensure wallet is connected and data is loaded');
+        return;
+      }
+
+      try {
+        const withAmount: bigint = parseUnits(workerWith, Number(tokenData.decimals));
+        const nonce = await readContract(APPKIT_WAGMI.wagmiConfig, {
+          address: fundAddress,
+          abi: chainContracts.Fund.abi,
+          functionName: 'nonce',
+          args: [],
+        }) as bigint;
+
+        const signature = await signData({
+          account: walletAddress as `0x${string}`,
+          domain: {
+            name: 'Fund',
+            version: '1',
+            chainId: 31337, // Hardhat local network
+            verifyingContract: fundAddress,
+          },
+          types: {
+            Withdraw: [
+              { name: 'fund', type: 'address' },
+              { name: 'amount', type: 'uint256' },
+              { name: 'nonce', type: 'uint256' },
+            ],
+          },
+          primaryType: 'Withdraw',
+          message: {
+            fund: fundAddress,
+            amount: withAmount,
+            nonce: nonce,
+          },
+        });
+        
+        // Auto-fill the withdrawal signature field
+        setOracleSign(signature);
+        alert("Withdrawal signature generated and filled! The worker can now execute withdrawal.");
+      } catch (error: any) {
+        console.error('Sign withdrawal error:', error);
+        alert(`Failed to sign withdrawal: ${error.message || 'Unknown error'}`);
+      }
     };
     signWithdrawalFun();
-  }, [walletAddress, workerWith, tokenData]);
+  }, [walletAddress, workerWith, tokenData, chainContracts, fundAddress, signData]);
   const execWithdrawal = useCallback(() => {
-    const signWithdrawalFun = async () => {
-      console.log("test exec with");
+    const execWithdrawalFun = async () => {
+      if (!chainContracts || !tokenData || !oracleSign) {
+        alert('Please ensure oracle has signed the withdrawal');
+        return;
+      }
+
+      try {
+        const withAmount: bigint = parseUnits(workerWith, Number(tokenData.decimals));
+
+        const { request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
+          address: fundAddress,
+          abi: chainContracts.Fund.abi,
+          functionName: 'withdraw',
+          args: [withAmount, oracleSign as `0x${string}`],
+        });
+
+        const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+        alert(`Withdrawal successful! Transaction: ${hash}`);
+        setWorkerWith(''); // Clear input
+        setOracleSign(''); // Clear signature
+      } catch (error: any) {
+        console.error('Withdrawal error:', error);
+        alert(`Withdrawal failed: ${error.message || 'Unknown error'}`);
+      }
     };
-    signWithdrawalFun();
-  }, []);
+    execWithdrawalFun();
+  }, [chainContracts, tokenData, workerWith, oracleSign, fundAddress]);
   const refund = useCallback(() => {
     const refundFun = async () => {
-      const { request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
-        address: fundAddress,
-        abi: chainContracts.Fund.abi,
-        functionName: 'refund',
-        args: [],
-      });
-      const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+      if (!chainContracts) {
+        alert('Please ensure wallet is connected');
+        return;
+      }
+
+      if (!confirm('Are you sure you want to refund all funders? This will return their proportional deposits and cannot be undone.')) {
+        return;
+      }
+
+      try {
+        const { request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
+          address: fundAddress,
+          abi: chainContracts.Fund.abi,
+          functionName: 'refund',
+          args: [],
+        });
+
+        const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+        alert(`Refund successful! All funders will receive their proportional deposits back. Transaction: ${hash}`);
+      } catch (error: any) {
+        console.error('Refund error:', error);
+        alert(`Refund failed: ${error.message || 'Unknown error'}`);
+      }
     };
     refundFun();
-  }, [chainContracts]);
+  }, [chainContracts, fundAddress]);
 
   const onSignChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const {value}: {value: string;} = event.target;
@@ -299,13 +389,18 @@ export default function FundPage({
             {(walletAddress?.toLowerCase() === fundData.worker.toLowerCase() && !fundData.locked) && (
               <div className="border-black border-2 p-2 flex flex-col gap-y-2">
                 <h3>Oracle Signature</h3>
+                <p className="text-sm text-gray-600">
+                  Cryptographic signature from oracle approving the fund terms (132 chars)
+                </p>
                 <input
                   className="border-black border-1 px-2 py-1"
                   pattern="^0x[a-fA-F0-9]{130}$"
                   value={oracleSign}
                   onChange={onSignChange}
+                  placeholder="Will auto-fill when oracle signs off..."
+                  readOnly
                 />
-                <button onClick={lockIn}>
+                <button onClick={lockIn} disabled={!oracleSign}>
                   Lock In
                 </button>
               </div>

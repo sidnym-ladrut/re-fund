@@ -1,14 +1,12 @@
 import type { Metadata } from "next";
-import { headers } from 'next/headers'
-import Link from "next/link";
+import { headers } from 'next/headers' // added
 import './globals.css';
-
 import ContextProvider from '@/comp/ContextProvider'
-import { ConnectButton } from "@/comp/ConnectButton";
+import { Navigation } from '@/comp/Navigation'
 
 export const metadata: Metadata = {
-  title: "re-fund | home",
-  description: "crowdfund cool projects using crypto",
+  title: "re-fund - Decentralized Crowdfunding",
+  description: "A simple crowdfunding platform built on Ethereum where builders can propose work, funders can finance this work, and oracles can evaluate and authorize payment.",
 };
 
 export default async function RootLayout({
@@ -21,29 +19,15 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
-      <body className="font-sans flex flex-col min-h-screen antialiased">
+      <body className="min-h-screen flex flex-col">
         <ContextProvider cookies={cookies}>
-          <header className="nav border-b-2">
-            <div className="content">
-              <h1>
-                <Link href="/">re-fund</Link>
-              </h1>
-              <ConnectButton />
-            </div>
-          </header>
-
-          <main className="bod w-full flex flex-grow">
-            <div className="w-full content flex flex-col gap-4">
-              {children}
-            </div>
+          <Navigation />
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {children}
           </main>
-
-          <footer className="nav border-t-2">
-            <div className="content text-center">
-              <div>Encode EVM 25Q3 T1</div>
-              <Link href="https://github.com/sidnym-ladrut/re-fund">
-                GitHub
-              </Link>
+          <footer className="bg-gray-50 border-t-2 border-gray-200 py-6">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-gray-600">
+              <p>&copy; 2025 re-fund. Built with ❤️ for decentralized crowdfunding.</p>
             </div>
           </footer>
         </ContextProvider>
