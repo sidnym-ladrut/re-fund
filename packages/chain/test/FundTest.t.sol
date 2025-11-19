@@ -12,8 +12,8 @@ contract FundTest is FundBaseTest {
   // Constants //
   ///////////////
 
-  bytes32 public constant FUND_TERMS = bytes32(uint256(1000));
-  bytes32 public constant BAD_TERMS = bytes32(uint256(1001));
+  string public constant FUND_TERMS = "bafkreigjokjc775uq75cv4n4wjsy4uofgwb3c7mi7epkpci2x6b26f3is4";
+  bytes32 public constant BAD_TERMS_HASH = bytes32(uint256(0));
   uint256 public constant ORACLE_CUT = 1e0 * 10 ** FUND_TOKEN_DECIMALS;
 
   ///////////////
@@ -21,7 +21,7 @@ contract FundTest is FundBaseTest {
   ///////////////
 
   modifier locked() {
-    bytes memory signature = _signAs191(_oracle(), FUND_TERMS);
+    bytes memory signature = _signAs(_oracle(), _fund().hashSignTerms());
     vm.prank(_worker());
     _fund().lockTerms(signature);
     _;
@@ -57,44 +57,44 @@ contract FundTest is FundBaseTest {
     assertEq(_fund().oracle(), _oracle());
 
     assertEq(_fund().oracleCut(), FUND_CUT);
-    assertEq(_fund().termsCID(), FUND_TERMS);
+    assertEq(_fund().terms(), FUND_TERMS);
     assertEq(address(_fund().payoutToken()), address(_fundToken));
   }
 
   function test_lockTerms_success() public {
-    bytes memory oracleTermsSignature = _signAs191(_oracle(), FUND_TERMS);
+    bytes memory oracleTermsSignature = _signAs(_oracle(), _fund().hashSignTerms());
     vm.prank(_worker());
     _fund().lockTerms(oracleTermsSignature);
     assertEq(_fund().termsSignature(), oracleTermsSignature);
   }
 
   function test_lockTerms_badSigner() public {
-    bytes memory workerTermsSignature = _signAs191(_worker(), FUND_TERMS);
+    bytes memory workerTermsSignature = _signAs(_worker(), _fund().hashSignTerms());
     vm.prank(_worker());
     vm.expectRevert();
     _fund().lockTerms(workerTermsSignature);
   }
 
   function test_lockTerms_badMessage() public {
-    bytes memory oracleRandomSignature = _signAs191(_oracle(), BAD_TERMS);
+    bytes memory oracleRandomSignature = _signAs(_oracle(), BAD_TERMS_HASH);
     vm.prank(_worker());
     vm.expectRevert();
     _fund().lockTerms(oracleRandomSignature);
   }
 
   function test_lockTerms_postLock() public locked {
-    bytes memory oracleTermsSignature = _signAs191(_oracle(), FUND_TERMS);
+    bytes memory oracleTermsSignature = _signAs(_oracle(), _fund().hashSignTerms());
     vm.prank(_worker());
     vm.expectRevert();
     _fund().lockTerms(oracleTermsSignature);
     vm.prank(_worker());
     vm.expectRevert();
-    _fund().updateTerms(FUND_CUT, _fundToken, BAD_TERMS);
+    _fund().updateTerms(FUND_CUT, _fundToken, "QmNezRZBYa6EZjx7346rvGmUhxPocNqEpP7YvpdYmytbW5");
   }
 
   function test_deposit_success() public locked {
     bytes32 permitHash = _fundToken.hashPermit(_funder(), address(_fund()), DEPO_AMOUNT, BLOCK_PERMIT_TIME);
-    bytes memory funderDepositSignature = _signAsRaw(_funder(), permitHash);
+    bytes memory funderDepositSignature = _signAs(_funder(), permitHash);
 
     vm.prank(_funder());
     vm.expectEmit();
@@ -106,13 +106,13 @@ contract FundTest is FundBaseTest {
   }
 
   function test_deposit_badPermit() public locked {
-    bytes memory funderDepositSignature = _signAsRaw(_funder(), BAD_TERMS);
+    bytes memory funderDepositSignature = _signAs(_funder(), BAD_TERMS_HASH);
     vm.expectRevert();
     _fund().deposit(_fundToken, _funder(), DEPO_AMOUNT, BLOCK_PERMIT_TIME, funderDepositSignature);
   }
 
   function test_withdraw_success() public locked fundedBy(1) {
-    bytes memory oracleWithdrawalSignature = _signAsRaw(_oracle(), _fund().hashWithdraw(DEPO_AMOUNT));
+    bytes memory oracleWithdrawalSignature = _signAs(_oracle(), _fund().hashWithdraw(DEPO_AMOUNT));
 
     vm.prank(_worker());
     vm.expectEmit();
@@ -125,22 +125,22 @@ contract FundTest is FundBaseTest {
   }
 
   function test_withdraw_badSigner() public locked fundedBy(1) {
-    bytes memory workerWithdrawalSignature = _signAsRaw(_worker(), _fund().hashWithdraw(DEPO_AMOUNT));
+    bytes memory workerWithdrawalSignature = _signAs(_worker(), _fund().hashWithdraw(DEPO_AMOUNT));
     vm.prank(_worker());
     vm.expectRevert();
     _fund().withdraw(DEPO_AMOUNT, workerWithdrawalSignature);
   }
 
   function test_withdraw_badMessage() public locked fundedBy(1) {
-    bytes memory oracleRandomSignature = _signAs191(_oracle(), BAD_TERMS);
+    bytes memory oracleRandomSignature = _signAs(_oracle(), BAD_TERMS_HASH);
     vm.prank(_worker());
     vm.expectRevert();
     _fund().withdraw(DEPO_AMOUNT, oracleRandomSignature);
   }
 
   function test_withdraw_badAmount() public locked fundedBy(1) {
-    bytes memory oracleRealWithdrawalSignature = _signAsRaw(_oracle(), _fund().hashWithdraw(DEPO_AMOUNT));
-    bytes memory oracleZeroWithdrawalSignature = _signAsRaw(_oracle(), _fund().hashWithdraw(0));
+    bytes memory oracleRealWithdrawalSignature = _signAs(_oracle(), _fund().hashWithdraw(DEPO_AMOUNT));
+    bytes memory oracleZeroWithdrawalSignature = _signAs(_oracle(), _fund().hashWithdraw(0));
 
     vm.prank(_worker());
     vm.expectRevert();
@@ -184,7 +184,7 @@ contract FundTest is FundBaseTest {
 
   function test_refund_multiDonor_complex() public locked fundedBy(2) {
     uint256 withdrawAmount = _fund().funds() / 2;
-    bytes memory oracleWithdrawalSignature = _signAsRaw(_oracle(), _fund().hashWithdraw(withdrawAmount));
+    bytes memory oracleWithdrawalSignature = _signAs(_oracle(), _fund().hashWithdraw(withdrawAmount));
     vm.prank(_worker());
     _fund().withdraw(withdrawAmount, oracleWithdrawalSignature);
     vm.prank(_worker());

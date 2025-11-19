@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 import {FundBaseTest} from "./FundBaseTest.sol";
 import {Fund} from "../contracts/Fund.sol";
 import {IFund} from "../contracts/IFund.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 // solc-ignore-next-line code-size
 contract FundFactoryTest is FundBaseTest {
@@ -11,7 +12,7 @@ contract FundFactoryTest is FundBaseTest {
   // Constants //
   ///////////////
 
-  bytes32 public constant FUND_BASE_TERMS = bytes32(uint256(1000));
+  string public constant FUND_BASE_TERMS = "QmNezRZBYa6EZjx7346rvGmUhxPocNqEpP7YvpdYmytbW";
 
   /////////////////////
   // State Variables //
@@ -27,7 +28,7 @@ contract FundFactoryTest is FundBaseTest {
 
   modifier locked() {
     for (uint256 i = 0; i < _funds.length; i++) {
-      bytes memory signature = _signAs191(_funds[i].oracle(), _funds[i].termsCID());
+      bytes memory signature = _signAs(_funds[i].oracle(), _funds[i].hashSignTerms());
       vm.prank(_funds[i].worker());
       _funds[i].lockTerms(signature);
     }
@@ -43,7 +44,8 @@ contract FundFactoryTest is FundBaseTest {
 
     _oracleContractsMap = new address[][](0);
     for (uint256 i = 0; i < PERROLE_COUNT; i++) {
-      bytes memory fundArgs = abi.encode(_workers[i], _oracles[i % 2], 0, _fundToken, bytes32(FUND_BASE_TERMS << i));
+      string memory fundTerms = string.concat(FUND_BASE_TERMS, Strings.toHexString(i));
+      bytes memory fundArgs = abi.encode(_workers[i], _oracles[i % 2], 0, _fundToken, fundTerms);
       vm.prank(_workers[i]);
       Fund fundContract = Fund(_fundFactory.deploy(fundArgs));
 
@@ -93,7 +95,7 @@ contract FundFactoryTest is FundBaseTest {
       _fundAs(_funds[i], _funders[i], (i + 1) * DEPO_AMOUNT);
     }
 
-    bytes memory signature = _signAsRaw(_funds[0].oracle(), _funds[0].hashWithdraw(DEPO_AMOUNT));
+    bytes memory signature = _signAs(_funds[0].oracle(), _funds[0].hashWithdraw(DEPO_AMOUNT));
     vm.prank(_workers[0]);
     _funds[0].withdraw(DEPO_AMOUNT, signature);
 

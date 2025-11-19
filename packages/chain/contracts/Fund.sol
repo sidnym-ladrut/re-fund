@@ -19,9 +19,9 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   // Constants //
   ///////////////
 
-  /// @notice EIP712 type hash for the `Initialize` action
-  bytes32 private constant _INITIALIZE_TYPEHASH =
-    keccak256("Initialize(address worker,address oracle,uint256 cut,address token,bytes32 terms)");
+  /// @notice EIP712 type hash for the `SignTerms` action
+  bytes32 private constant _SIGNTERMS_TYPEHASH =
+    keccak256("SignTerms(bytes32 terms)");
   /// @notice EIP712 type hash for the `Withdraw` action
   bytes32 private constant _WITHDRAW_TYPEHASH =
     keccak256("Withdraw(address fund,uint256 amount,uint256 nonce)");
@@ -41,8 +41,8 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @dev The ERC20 type is constrained to ERC20Permit to enable 1-transaction, gas-efficient deposits
   /// @dev See https://eips.ethereum.org/EIPS/eip-2612#abstract
   ERC20Permit public payoutToken;
-  /// @notice The IPFS CID of the JSON file with the terms of the work
-  bytes32 public termsCID;
+  /// @notice The terms of the work for this fund (generally stored as the IPFS CID of the JSON file)
+  string public terms;
   /// @notice The nonce for the next withdrawal
   uint8 public nonce;
   /// @notice The total amount of value withdrawn from this fund
@@ -99,14 +99,14 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @dev This should only be invoked internally by the factory to initialize clone proxies
   /// @param args The encoded arguments array containing the worker address and the terms (see {updateTerms})
   function initialize(bytes calldata args) initializer external {
-    (address worker_, address oracle_, uint256 cut, address token, bytes32 terms) =
-      abi.decode(args, (address, address, uint256, address, bytes32));
+    (address worker_, address oracle_, uint256 cut, address token, string memory terms_) =
+      abi.decode(args, (address, address, uint256, address, string));
 
     __Ownable_init(worker_);
     __EIP712_init("Fund", "1");
     oracle = oracle_;
 
-    updateTerms(cut, ERC20Permit(token), terms);
+    updateTerms(cut, ERC20Permit(token), terms_);
   }
 
   /// @inheritdoc IFund
@@ -117,22 +117,20 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @notice Modifies the set of terms for this fund contract
   /// @param cut The percentage compensation allotted to the oracle on withdrawal as a 2-digits integer value
   /// @param token The address of the ERC20Permit token that will be paid out to the worker
-  /// @param terms The IPFS CID of the JSON blob defining the scope of work for this fund
-  function updateTerms(uint256 cut, ERC20Permit token, bytes32 terms)
+  /// @param terms_ The IPFS CID of the JSON blob defining the scope of work for this fund
+  function updateTerms(uint256 cut, ERC20Permit token, string memory terms_)
       public beforeLocked {
     require(cut <= _CUT_MAXIMUM, "Oracle cut must be a 2-digit percentage (0 <= cut <= 1e4)");
     oracleCut = cut;
     payoutToken = token;
-    termsCID = terms;
+    terms = terms_;
   }
 
   /// @notice Finalizes the contract terms with a signature from the oracle (i.e. assessor)
-  /// @param oracleSignature An EIP-191 signed message of the {termsCID} from the oracle
+  /// @dev The {hashSignTerms} function can be used to generate the EIP-712 signature payload for the current terms
+  /// @param oracleSignature An EIP-191 signed message of the {terms} from the oracle
   function lockTerms(bytes memory oracleSignature) public onlyOwner beforeLocked {
-    (address signer, ECDSA.RecoverError error, ) = ECDSA.tryRecover(
-      MessageHashUtils.toEthSignedMessageHash(termsCID),
-      oracleSignature
-    );
+    (address signer, ECDSA.RecoverError error, ) = ECDSA.tryRecover(hashSignTerms(), oracleSignature);
     require(error == ECDSA.RecoverError.NoError, "Malformed signature provided");
     require(signer == oracle, "Invalid signer provided (must be the contract oracle)");
     termsSignature = oracleSignature;
@@ -260,8 +258,16 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   // Helper Functions //
   //////////////////////
 
+  /// @notice Generates an EIP-712 'SignTerms' signature payload for hash of the current terms
+  /// @dev For details on signature construction, see: https://eips.ethereum.org/EIPS/eip-712#definition-of-domainseparator
+  /// @return hash The EIP-712 'SignTerms' payload that can be signed by the {oracle} to authorize term lock-in
+  function hashSignTerms() public view returns (bytes32 hash) {
+    bytes32 structHash = keccak256(abi.encode(_SIGNTERMS_TYPEHASH, keccak256(bytes(terms))));
+    return _hashTypedDataV4(structHash);
+  }
+
   /// @notice Generates an EIP-712 'Withdraw' signature payload for the given amount at current withdrawal nonce
-  /// @dev For details on 'Withdraw' signature construction, see: https://eips.ethereum.org/EIPS/eip-712#definition-of-domainseparator
+  /// @dev For details on signature construction, see: https://eips.ethereum.org/EIPS/eip-712#definition-of-domainseparator
   /// @param amount The amount of {payoutToken} that will be withdrawn
   /// @return hash The EIP-712 'Withdraw' payload that can be signed by the {oracle} to authorize a withdrawal
   function hashWithdraw(uint256 amount) public view returns (bytes32 hash) {

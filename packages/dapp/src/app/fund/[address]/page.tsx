@@ -75,6 +75,7 @@ export default function FundPage({
         args: [oracleSign],
       });
       const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+      window.location.reload(); // FIXME: Super clumsy cache invalidation
     };
     lockInFun();
   }, [oracleSign, chainContracts]);
@@ -121,6 +122,7 @@ export default function FundPage({
         args: [fundData.token, walletAddress, depoAmount, depoTime, signature],
       });
       const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+      window.location.reload(); // FIXME: Super clumsy cache invalidation
     };
     depositFun();
   }, [walletAddress, chainId, funderDepo, fundData, tokenData, chainContracts, signMessage]);
@@ -169,6 +171,7 @@ export default function FundPage({
         args: [withAmount, oracleSign],
       });
       const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+      window.location.reload(); // FIXME: Super clumsy cache invalidation
     };
     execWithdrawalFun();
   }, [walletAddress, chainContracts, oracleSign, workerWith, tokenData]);
@@ -181,6 +184,7 @@ export default function FundPage({
         args: [],
       });
       const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+      window.location.reload(); // FIXME: Super clumsy cache invalidation
     };
     refundFun();
   }, [chainContracts]);
@@ -327,6 +331,7 @@ export default function FundPage({
                   pattern="^0x[a-fA-F0-9]{130}$"
                   value={oracleSign}
                   onChange={onSignChange}
+                  placeholder={`0x${'0'.repeat(130)}`}
                 />
                 <button onClick={lockIn}>
                   Lock In
@@ -378,6 +383,7 @@ export default function FundPage({
                       pattern="^0x[a-fA-F0-9]{130}$"
                       value={oracleSign}
                       onChange={onSignChange}
+                      placeholder={`0x${'0'.repeat(130)}`}
                     />
                     <button onClick={execWithdrawal}>
                       Withdraw

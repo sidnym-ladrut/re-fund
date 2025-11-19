@@ -71,18 +71,13 @@ abstract contract FundBaseTest is Test {
 
   function _fundAs(Fund fund, address funder, uint256 amount) internal {
     bytes32 hashPermit = _fundToken.hashPermit(funder, address(fund), amount, BLOCK_PERMIT_TIME);
-    bytes memory signature = _signAsRaw(funder, hashPermit);
+    bytes memory signature = _signAs(funder, hashPermit);
     vm.prank(funder);
     fund.deposit(_fundToken, funder, amount, BLOCK_PERMIT_TIME, signature);
   }
 
-  function _signAs191(address addr, bytes32 data) internal view returns (bytes memory signature) {
-    bytes32 hash = MessageHashUtils.toEthSignedMessageHash(data);
-    return _signAsRaw(addr, hash);
-  }
-
-  function _signAsRaw(address addr, bytes32 data) internal view returns (bytes memory signature) {
-    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_keys[addr], data);
+  function _signAs(address signer, bytes32 data) internal view returns (bytes memory signature) {
+    (uint8 v, bytes32 r, bytes32 s) = vm.sign(_keys[signer], data);
     return abi.encodePacked(r, s, v);
   }
 
