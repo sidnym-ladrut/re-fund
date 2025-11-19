@@ -1,5 +1,6 @@
 'use client'
 import { use, useState, useEffect, useMemo, useCallback, ChangeEvent } from 'react'
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { readContract } from '@wagmi/core'
 import { useSignTypedData } from 'wagmi'
@@ -11,7 +12,7 @@ import { Address } from "@/comp/Address";
 import { formatNumber, nextPermitTime } from "@/lib/util";
 import { useChainContracts } from "@/hook/wallet";
 import { simulateContract, writeContract } from '@wagmi/core'
-import { APPKIT_WAGMI } from "@/cfg";
+import { APPKIT_WAGMI, PINATA } from "@/cfg";
 
 interface FundData {
   worker: `0x${string}`;
@@ -19,6 +20,12 @@ interface FundData {
   token: `0x${string}`;
   terms: string;
   locked: boolean;
+}
+
+interface TermsData {
+  title?: string;
+  text?: string;
+  url?: string;
 }
 
 interface TokenData {
@@ -46,6 +53,7 @@ export default function FundPage({
   const { signTypedDataAsync: signData } = useSignTypedData();
   const chainContracts = useChainContracts();
   const [fundData, setFundData] = useState<FundData | undefined>(undefined);
+  const [termsData, setTermsData] = useState<TermsData | undefined>(undefined);
   const [tokenData, setTokenData] = useState<TokenData | undefined>(undefined);
   const [oracleSign, setOracleSign] = useState<string>("");
   const [funderDepo, setFunderDepo] = useState<string>("");
@@ -361,137 +369,194 @@ export default function FundPage({
     }
   }, [chainContracts, fundAddress, fundData]);
 
+  useEffect(() => {
+    const queryIPFS = async () => {
+      if (!!fundData) {
+        try {
+          const { data, contentType } = await PINATA.gateways.public.get(fundData.terms);
+          if (contentType === "application/json") {
+            if (data?.schema === "fund-plaintext" && data?.version === 0) {
+              const dataUrl = await PINATA.gateways.public.convert(fundData.terms);
+              setTermsData({
+                text: data?.terms?.text ?? "",
+                url: dataUrl,
+              });
+            } else {
+              setTermsData({ text: fundData.terms });
+            }
+          } else {
+            setTermsData({ text: fundData.terms });
+          }
+        } catch (err: any) {
+          console.error('Unable to fetch terms:', err);
+          setTermsData({});
+        }
+      }
+    };
+    queryIPFS();
+  }, [fundData, setTermsData]);
+
   return (
     <div className="flex flex-col gap-y-4">
       <h2>Fund @ <Address address={fundAddress} /></h2>
       <div className="flex flex-col gap-y-2">
-        {(fundData === undefined) ? (
+        {!fundData ? (
           <span>Loading...</span>
         ) : (
           <>
-            <ul>
-              <li>
-                <strong>Worker: </strong>
-                <Address address={fundData.worker} />
-              </li>
-              <li>
-                <strong>Oracle: </strong>
-                <Address address={fundData.oracle} />
-              </li>
-              <li>
-                <strong>Status: </strong>
-                {fundData.locked ? "Locked" : "Pending"}
-              </li>
-              {fundData.locked && (
+            <>
+              <h3>Meta</h3>
+              <ul>
                 <li>
-                  <strong>Terms: </strong>
-                  {fundData.terms}
+                  <strong>Worker: </strong>
+                  <Address address={fundData.worker} />
                 </li>
+                <li>
+                  <strong>Oracle: </strong>
+                  <Address address={fundData.oracle} />
+                </li>
+                <li>
+                  <strong>Status: </strong>
+                  {fundData.locked ? "Locked" : "Pending"}
+                </li>
+                <li>
+                  <strong>Token: </strong>
+                  <Address address={fundData.token} />
+                  {(tokenData === undefined) ? (
+                    <span>Loading...</span>
+                  ) : (
+                    <ul>
+                      <li>
+                        <strong>Name: </strong>
+                        {tokenData.name}
+                      </li>
+                      <li>
+                        <strong>Supply: </strong>
+                        {formatNumber(formatUnits(tokenData.supply, tokenData.decimals))} {tokenData.symbol}
+                      </li>
+                    </ul>
+                  )}
+                </li>
+              </ul>
+            </>
+            <>
+              <h3>Terms</h3>
+              {!termsData ? (
+                <span>Loading...</span>
+              ) : (
+                <>
+                  <p>
+                    <strong>Reference: </strong>
+                    {!termsData.url ? (
+                      <span>fundData.terms</span>
+                    ) : (
+                      <Link
+                        className="transition-colors duration-200 hover:bg-gray-100"
+                        href={termsData.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {fundData.terms}
+                      </Link>
+                    )}
+                  </p>
+                  {!termsData?.text ? (
+                    <p className="italic">Extended IPFS Data Unavailable</p>
+                  ) : (
+                    <p>{termsData.text}</p>
+                  )}
+                </>
               )}
-              <li>
-                <strong>Token: </strong>
-                <Address address={fundData.token} />
-                {(tokenData === undefined) ? (
-                  <span>Loading...</span>
-                ) : (
-                  <ul>
-                    <li>
-                      <strong>Name: </strong>
-                      {tokenData.name}
-                    </li>
-                    <li>
-                      <strong>Supply: </strong>
-                      {formatNumber(formatUnits(tokenData.supply, tokenData.decimals))} {tokenData.symbol}
-                    </li>
-                  </ul>
-                )}
-              </li>
-            </ul>
-            {(walletAddress?.toLowerCase() === fundData.oracle.toLowerCase() && !fundData.locked) && (
-              <button onClick={signOff}>
-                Sign Off
-              </button>
-            )}
-            {(walletAddress?.toLowerCase() === fundData.worker.toLowerCase() && !fundData.locked) && (
-              <div className="border-black border-2 p-2 flex flex-col gap-y-2">
-                <h3>Oracle Signature</h3>
-                <p className="text-sm text-gray-600">
-                  Cryptographic signature from oracle approving the fund terms (132 chars)
-                </p>
-                <input
-                  className="border-black border-1 px-2 py-1"
-                  pattern="^0x[a-fA-F0-9]{130}$"
-                  value={oracleSign}
-                  onChange={onSignChange}
-                  placeholder="Will auto-fill when oracle signs off..."
-                />
-                <button onClick={lockIn} disabled={!oracleSign}>
-                  Lock In
+            </>
+            <>
+              <h3>Actions</h3>
+              {(walletAddress?.toLowerCase() === fundData.oracle.toLowerCase() && !fundData.locked) && (
+                <button onClick={signOff}>
+                  Sign Off
                 </button>
-              </div>
-            )}
-            {(isConnected && !!fundData?.locked) && (
-              <div className="border-black border-2 p-2 flex flex-col gap-y-2">
-                <h3>Deposit Amount</h3>
-                <input
-                  className="border-black border-1 px-2 py-1"
-                  type="number"
-                  step="0.0001"
-                  step="0.0001"
-                  value={funderDepo}
-                  onChange={onDepoChange}
-                  placeholder="10"
-                />
-                <button onClick={deposit}>
-                  Deposit
-                </button>
-              </div>
-            )}
-            {(
-                (walletAddress?.toLowerCase() === fundData.worker.toLowerCase() ||
-                walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) &&
-                fundData.locked) && (
-              <div className="border-black border-2 p-2 flex flex-col gap-y-2">
-                <h3>Withdrawal Amount</h3>
-                <input
-                  className="border-black border-1 px-2 py-1"
-                  type="number"
-                  step="0.0001"
-                  step="0.0001"
-                  value={workerWith}
-                  onChange={onWithChange}
-                  placeholder="10"
-                />
-                {(walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) && (
-                  <button onClick={signWithdrawal}>
-                    Sign Off
+              )}
+              {(walletAddress?.toLowerCase() === fundData.worker.toLowerCase() && !fundData.locked) && (
+                <div className="border-black border-2 p-2 flex flex-col gap-y-2">
+                  <h3>Oracle Signature</h3>
+                  <p className="text-sm text-gray-600">
+                    Cryptographic signature from oracle approving the fund terms (132 chars)
+                  </p>
+                  <input
+                    className="border-black border-1 px-2 py-1"
+                    pattern="^0x[a-fA-F0-9]{130}$"
+                    value={oracleSign}
+                    onChange={onSignChange}
+                    placeholder={`0x${'0'.repeat(130)}`}
+                  />
+                  <button onClick={lockIn} disabled={!oracleSign}>
+                    Lock In
                   </button>
-                )}
-                {(walletAddress?.toLowerCase() === fundData.worker.toLowerCase()) && (
-                  <>
-                    <h3>Withdrawal Signature</h3>
-                    <input
-                      className="border-black border-1 px-2 py-1"
-                      pattern="^0x[a-fA-F0-9]{130}$"
-                      value={oracleSign}
-                      onChange={onSignChange}
-                      placeholder={`0x${'0'.repeat(130)}`}
-                    />
-                    <button onClick={execWithdrawal}>
-                      Withdraw
+                </div>
+              )}
+              {(isConnected && !!fundData?.locked) && (
+                <div className="border-black border-2 p-2 flex flex-col gap-y-2">
+                  <h3>Deposit Amount</h3>
+                  <input
+                    className="border-black border-1 px-2 py-1"
+                    type="number"
+                    step="0.0001"
+                    step="0.0001"
+                    value={funderDepo}
+                    onChange={onDepoChange}
+                    placeholder="10"
+                  />
+                  <button onClick={deposit}>
+                    Deposit
+                  </button>
+                </div>
+              )}
+              {(
+                  (walletAddress?.toLowerCase() === fundData.worker.toLowerCase() ||
+                  walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) &&
+                  fundData.locked
+              ) && (
+                <div className="border-black border-2 p-2 flex flex-col gap-y-2">
+                  <h3>Withdrawal Amount</h3>
+                  <input
+                    className="border-black border-1 px-2 py-1"
+                    type="number"
+                    step="0.0001"
+                    step="0.0001"
+                    value={workerWith}
+                    onChange={onWithChange}
+                    placeholder="10"
+                  />
+                  {(walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) && (
+                    <button onClick={signWithdrawal}>
+                      Sign Off
                     </button>
-                  </>
-                )}
-              </div>
-            )}
-            {(
-                (walletAddress?.toLowerCase() === fundData.worker.toLowerCase() ||
-                walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) &&
-                fundData.locked) && (
-              <button onClick={refund}>
-                Refund
-              </button>
-            )}
+                  )}
+                  {(walletAddress?.toLowerCase() === fundData.worker.toLowerCase()) && (
+                    <>
+                      <h3>Withdrawal Signature</h3>
+                      <input
+                        className="border-black border-1 px-2 py-1"
+                        pattern="^0x[a-fA-F0-9]{130}$"
+                        value={oracleSign}
+                        onChange={onSignChange}
+                        placeholder={`0x${'0'.repeat(130)}`}
+                      />
+                      <button onClick={execWithdrawal}>
+                        Withdraw
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+              {(
+                  (walletAddress?.toLowerCase() === fundData.worker.toLowerCase() ||
+                  walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) &&
+                  fundData.locked) && (
+                <button onClick={refund}>
+                  Refund
+                </button>
+              )}
+            </>
           </>
         )}
       </div>

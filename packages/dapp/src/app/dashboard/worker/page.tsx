@@ -1,7 +1,7 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
+import { useAppKitAccount } from "@reown/appkit/react";
 import type { Provider } from "@reown/appkit/react";
 import { readContract, writeContract, waitForTransactionReceipt, simulateContract } from 'wagmi/actions';
 import { formatUnits, encodeAbiParameters, parseAbiParameters, keccak256, toHex } from 'viem';
@@ -10,9 +10,9 @@ import { Card } from "@/comp/Card";
 import { Modal } from "@/comp/Modal";
 import { StatusBadge } from "@/comp/StatusBadge";
 import { Address } from "@/comp/Address";
+import { useChainContracts } from "@/hook/wallet";
 import { formatNumber } from "@/lib/util";
-import { APPKIT_WAGMI } from "@/cfg";
-import Contracts from '@/../chain/contracts';
+import { APPKIT_WAGMI, PINATA } from "@/cfg";
 
 interface Fund {
   address: `0x${string}`;
@@ -30,27 +30,23 @@ export default function WorkerDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const ChainContracts = useMemo(() => {
-    if (!isConnected || !caipAddress) return undefined;
-    const chainId = caipAddress.split(':')?.[1];
-    return chainId ? Contracts[chainId as keyof typeof Contracts] : undefined;
-  }, [isConnected, caipAddress]);
+  const chainContracts = useChainContracts();
 
   useEffect(() => {
-    if (isConnected && walletAddress && ChainContracts) {
+    if (isConnected && walletAddress && chainContracts) {
       loadWorkerFunds();
     }
-  }, [isConnected, walletAddress, ChainContracts]);
+  }, [isConnected, walletAddress, chainContracts]);
 
   const loadWorkerFunds = async () => {
-    if (!ChainContracts || !walletAddress) return;
+    if (!chainContracts || !walletAddress) return;
 
     setIsLoading(true);
     try {
       // Filter funds where this wallet is the worker
       const workerFunds: `0x${string}`[] = await readContract(APPKIT_WAGMI.wagmiConfig, {
-        address: ChainContracts.FundFactory.address,
-        abi: ChainContracts.FundFactory.abi,
+        address: chainContracts.FundFactory.address,
+        abi: chainContracts.FundFactory.abi,
         functionName: 'instances',
         args: [walletAddress, 0],
       }) as `0x${string}`[];
@@ -63,31 +59,31 @@ export default function WorkerDashboard() {
           const [worker, oracle, token, fundsAvailable, termsSignature] = await Promise.all([
             readContract(APPKIT_WAGMI.wagmiConfig, {
               address: fundAddress,
-              abi: ChainContracts.Fund.abi,
+              abi: chainContracts.Fund.abi,
               functionName: 'worker',
               args: [],
             }),
             readContract(APPKIT_WAGMI.wagmiConfig, {
               address: fundAddress,
-              abi: ChainContracts.Fund.abi,
+              abi: chainContracts.Fund.abi,
               functionName: 'oracle',
               args: [],
             }),
             readContract(APPKIT_WAGMI.wagmiConfig, {
               address: fundAddress,
-              abi: ChainContracts.Fund.abi,
+              abi: chainContracts.Fund.abi,
               functionName: 'payoutToken',
               args: [],
             }),
             readContract(APPKIT_WAGMI.wagmiConfig, {
               address: fundAddress,
-              abi: ChainContracts.Fund.abi,
+              abi: chainContracts.Fund.abi,
               functionName: 'fundsAvailable',
               args: [],
             }),
             readContract(APPKIT_WAGMI.wagmiConfig, {
               address: fundAddress,
-              abi: ChainContracts.Fund.abi,
+              abi: chainContracts.Fund.abi,
               functionName: 'termsSignature',
               args: [],
             }),
@@ -228,7 +224,6 @@ export default function WorkerDashboard() {
 
 function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
   const { address: walletAddress, isConnected, caipAddress } = useAppKitAccount();
-  const { walletProvider } = useAppKitProvider<Provider>('eip155');
   const [formData, setFormData] = useState({
     oracle: '',
     oracleCut: '',
@@ -238,13 +233,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-
-  // Use the new hook from teammate's code
-  const ChainContracts = useMemo(() => {
-    if (!isConnected || !caipAddress) return undefined;
-    const chainId = caipAddress.split(':')?.[1];
-    return chainId ? Contracts[chainId as unknown as keyof typeof Contracts] : undefined;
-  }, [isConnected, caipAddress]);
+  const chainContracts = useChainContracts();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,7 +241,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
     setIsSubmitting(true);
 
     try {
-      if (!ChainContracts || !walletAddress || !walletProvider) {
+      if (!chainContracts || !walletAddress) {
         throw new Error('Wallet not connected');
       }
 
@@ -270,8 +259,22 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
         throw new Error('Oracle cut must be between 0 and 100%');
       }
 
-      // FIXME: Upload to IPFS and get Content ID
-      const terms = formData.terms;
+      const salt = keccak256(toHex(Date.now()));
+      const termsJson = {
+        schema: "fund-plaintext",
+        version: 0,
+        terms: { text: formData.terms },
+      };
+      const termsFile = new File(
+        [JSON.stringify(termsJson, null, 2)],
+        `fund-terms-${salt}.json`,
+        { type: "application/json" },
+      );
+      const termsUpload = await PINATA.upload.public.file(termsFile);
+      const terms = termsUpload?.cid;
+      if (!terms) {
+        throw new Error('Failed to upload terms to IPFS via Pinata');
+      }
 
       console.log('Creating fund with:', {
         worker: walletAddress,
@@ -293,11 +296,9 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
         ]
       );
 
-      // Use teammate's improved approach with simulation + salt
-      const salt = keccak256(toHex(Date.now()));
       const { result, request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
-        address: ChainContracts.FundFactory.address,
-        abi: ChainContracts.FundFactory.abi,
+        address: chainContracts.FundFactory.address,
+        abi: chainContracts.FundFactory.abi,
         functionName: 'deploy',
         args: [fundArgs],
       });
@@ -388,10 +389,10 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
             required
             disabled={isSubmitting}
           />
-          {ChainContracts?.FundToken && (
+          {chainContracts?.FundToken && (
             <button
               type="button"
-              onClick={() => setFormData({ ...formData, token: ChainContracts.FundToken.address })}
+              onClick={() => setFormData({ ...formData, token: chainContracts.FundToken.address })}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 whitespace-nowrap text-sm"
               disabled={isSubmitting}
             >
@@ -401,8 +402,8 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
         <p className="text-sm text-gray-500 mt-1">
           ERC20 token address for payouts (must support ERC20Permit)
-          {ChainContracts?.FundToken && (
-            <span className="block mt-0.5">FundToken: {ChainContracts.FundToken.address}</span>
+          {chainContracts?.FundToken && (
+            <span className="block mt-0.5">FundToken: {chainContracts.FundToken.address}</span>
           )}
         </p>
       </div>

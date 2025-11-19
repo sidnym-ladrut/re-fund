@@ -7,7 +7,7 @@ h2 {
     @apply font-medium hyphens-auto text-2xl sm:text-3xl;
 }
 h3 {
-    @apply font-medium text-gray-500 text-lg sm:text-xl;
+    @apply font-bold text-gray-500 text-lg sm:text-xl;
 }
 h4 {
     @apply text-gray-500 text-base sm:text-lg;
