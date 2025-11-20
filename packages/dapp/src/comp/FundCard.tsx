@@ -24,7 +24,7 @@ export function FundCard({
   const router = useRouter();
 
   return (
-    <Card onClick={() => router.push(`/fund/${address}`)}>
+    <Card onClick={() => router.push(`/browser/${address}`)}>
       <div className="space-y-3">
         <div className="flex justify-between items-start">
           <div>

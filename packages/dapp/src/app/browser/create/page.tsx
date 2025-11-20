@@ -137,7 +137,7 @@ export default function CreatePage() {
           args: [args, salt],
         });
         const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
-        router.push(`/fund/${result}`);
+        router.push(`/browser/${result}`);
       }
     };
     createFund();

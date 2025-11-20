@@ -83,16 +83,21 @@ export default function FundPage({
           terms: keccak256(fundData?.terms),
         },
       });
+      
+      // Save signature to localStorage for this fund
+      const storageKey = `fund-signature-${fundAddress.toLowerCase()}`;
+      localStorage.setItem(storageKey, signature);
+      
       if (walletAddress.toLowerCase() === fundData?.worker?.toLowerCase()) {
         // Auto-fill the signature input field
         setOracleSign(signature);
         alert("Signature generated and filled! You can now click 'Lock In' to activate the fund.");
       } else {
-        prompt("Signature generated! Send this to the project worker.", signature);
+        alert(`Signature saved! The worker can now lock the fund.\n\nSignature: ${signature}`);
       }
     };
     signOffFun();
-  }, [walletAddress, chainId, fundData, chainContracts, signData]);
+  }, [walletAddress, chainId, fundData, fundAddress, signData]);
   const lockIn = useCallback(() => {
     const lockInFun = async () => {
       const { request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
@@ -102,10 +107,15 @@ export default function FundPage({
         args: [oracleSign],
       });
       const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+      
+      // Clear the saved signature after successful lock
+      const storageKey = `fund-signature-${fundAddress.toLowerCase()}`;
+      localStorage.removeItem(storageKey);
+      
       window.location.reload(); // FIXME: Super clumsy cache invalidation
     };
     lockInFun();
-  }, [oracleSign, chainContracts]);
+  }, [oracleSign, chainContracts, fundAddress]);
   const deposit = useCallback(() => {
     const depositFun = async () => {
       if (!chainContracts || !fundData || !tokenData || !walletAddress) {
@@ -207,13 +217,22 @@ export default function FundPage({
           },
         });
 
+        // Save withdrawal signature AND amount to localStorage
+        const storageKey = `fund-withdrawal-${fundAddress.toLowerCase()}-${nonce}`;
+        const withdrawalData = {
+          signature,
+          amount: workerWith,
+          nonce: nonce.toString()
+        };
+        localStorage.setItem(storageKey, JSON.stringify(withdrawalData));
+        
         // Auto-fill the withdrawal signature field
         if (walletAddress.toLowerCase() === fundData?.worker?.toLowerCase()) {
           // Auto-fill the signature input field
           setOracleSign(signature);
-          alert("Withdrawal signature generated and filled! You can now execute withdrawal.");
+          alert("Withdrawal signature generated and filled! You can now execute the withdrawal.");
         } else {
-          prompt("Signature generated! Send this to the project worker.", signature);
+          alert(`Withdrawal signature saved! The worker can now execute the withdrawal for ${workerWith} tokens.\n\nSignature: ${signature}`);
         }
       } catch (error: any) {
         console.error('Sign withdrawal error:', error);
@@ -228,8 +247,22 @@ export default function FundPage({
         alert('Please ensure oracle has signed the withdrawal');
         return;
       }
+      
+      if (!workerWith || parseFloat(workerWith) <= 0) {
+        alert('Please enter a valid withdrawal amount');
+        return;
+      }
+      
       try {
         const withAmount: bigint = parseUnits(workerWith, Number(tokenData.decimals));
+        
+        // Get the current nonce before withdrawal
+        const nonce = await readContract(APPKIT_WAGMI.wagmiConfig, {
+          address: fundAddress,
+          abi: chainContracts.Fund.abi,
+          functionName: 'nonce',
+          args: [],
+        }) as bigint;
 
         const { request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundAddress,
@@ -239,6 +272,11 @@ export default function FundPage({
         });
 
         const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+        
+        // Clear the saved withdrawal signature after successful withdrawal
+        const storageKey = `fund-withdrawal-${fundAddress.toLowerCase()}-${nonce}`;
+        localStorage.removeItem(storageKey);
+        
         alert(`Withdrawal successful! Transaction: ${hash}`);
         setWorkerWith(''); // Clear input
         setOracleSign(''); // Clear signature
@@ -249,7 +287,7 @@ export default function FundPage({
       }
     };
     execWithdrawalFun();
-  }, [chainContracts, chainId, tokenData, workerWith, oracleSign, fundAddress]);
+  }, [chainContracts, tokenData, workerWith, oracleSign, fundAddress]);
   const refund = useCallback(() => {
     const refundFun = async () => {
       if (!chainContracts) {
@@ -328,6 +366,16 @@ export default function FundPage({
         }),
       ]).then(([worker, oracle, token, terms, termsSignature]) => {
         setFundData({worker, oracle, token, terms, locked: (termsSignature !== "0x")});
+        
+        // If fund is not locked and user is the worker, try to load saved signature
+        if (termsSignature === "0x" && walletAddress?.toLowerCase() === worker.toLowerCase()) {
+          const storageKey = `fund-signature-${fundAddress.toLowerCase()}`;
+          const savedSignature = localStorage.getItem(storageKey);
+          if (savedSignature) {
+            setOracleSign(savedSignature);
+            console.log('Loaded saved oracle signature from localStorage');
+          }
+        }
       }).catch((error) => {
         console.log(error);
       });
@@ -368,6 +416,40 @@ export default function FundPage({
       });
     }
   }, [chainContracts, fundAddress, fundData]);
+
+  // Load withdrawal signature if available
+  useEffect(() => {
+    const loadWithdrawalSignature = async () => {
+      if (!!chainContracts && !!fundData && fundData.locked && walletAddress?.toLowerCase() === fundData.worker.toLowerCase()) {
+        try {
+          const nonce = await readContract(APPKIT_WAGMI.wagmiConfig, {
+            address: fundAddress,
+            abi: chainContracts.Fund.abi,
+            functionName: 'nonce',
+            args: [],
+          }) as bigint;
+          
+          const storageKey = `fund-withdrawal-${fundAddress.toLowerCase()}-${nonce}`;
+          const savedData = localStorage.getItem(storageKey);
+          if (savedData) {
+            try {
+              const withdrawalData = JSON.parse(savedData);
+              setOracleSign(withdrawalData.signature);
+              setWorkerWith(withdrawalData.amount);
+              console.log('Loaded saved withdrawal signature and amount from localStorage');
+            } catch (e) {
+              // Old format (just signature string), handle gracefully
+              setOracleSign(savedData);
+              console.log('Loaded saved withdrawal signature from localStorage (old format)');
+            }
+          }
+        } catch (error) {
+          console.error('Error loading withdrawal signature:', error);
+        }
+      }
+    };
+    loadWithdrawalSignature();
+  }, [chainContracts, fundAddress, fundData, walletAddress]);
 
   useEffect(() => {
     const queryIPFS = async () => {

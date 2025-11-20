@@ -47,6 +47,9 @@ export default function WorkerDashboard() {
 
     setIsLoading(true);
     try {
+      console.log('Worker Dashboard - Connected wallet address:', walletAddress);
+      console.log('Worker Dashboard - CAIP address:', caipAddress);
+      
       // Filter funds where this wallet is the worker
       const workerFunds: `0x${string}`[] = await readContract(APPKIT_WAGMI.wagmiConfig, {
         address: ChainContracts.FundFactory.address,
@@ -55,7 +58,7 @@ export default function WorkerDashboard() {
         args: [walletAddress, 0],
       }) as `0x${string}`[];
 
-      console.log('Found worker funds:', workerFunds);
+      console.log('Found worker funds for', walletAddress, ':', workerFunds);
 
       // Load details for each fund
       const fundDetails = await Promise.all(
@@ -175,7 +178,7 @@ export default function WorkerDashboard() {
             {funds.map((fund) => (
               <Card
                 key={fund.address}
-                onClick={() => router.push(`/fund/${fund.address}`)}
+                onClick={() => router.push(`/browser/${fund.address}`)}
                 className="hover:border-black cursor-pointer"
               >
                 <div className="space-y-3">
@@ -337,7 +340,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
 
       // Success! Close modal and redirect to fund
       onSuccess();
-      router.push(`/fund/${result}`);
+      router.push(`/browser/${result}`);
     } catch (err: any) {
       console.error('Error creating fund:', err);
       setError(err.message || 'Failed to create fund');
