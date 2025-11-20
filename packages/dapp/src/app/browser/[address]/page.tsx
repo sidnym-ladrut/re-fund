@@ -320,6 +320,35 @@ export default function FundPage({
     };
     refundFun();
   }, [chainContracts, fundAddress]);
+  const closeFund = useCallback(() => {
+    const closeFundFun = async () => {
+      if (!chainContracts) {
+        alert('Please ensure wallet is connected');
+        return;
+      }
+
+      if (!confirm('Are you sure you want to close the fund? This will prevent future deposits and cannot be undone.')) {
+        return;
+      }
+
+      try {
+        const { request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
+          address: fundAddress,
+          abi: chainContracts.Fund.abi,
+          functionName: 'close',
+          args: [],
+        });
+
+        const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
+        alert(`Close successful! Transaction: ${hash}`);
+        window.location.reload(); // FIXME: Super clumsy cache invalidation
+      } catch (error: any) {
+        console.error('Close error:', error);
+        alert(`Close failed: ${error.message || 'Unknown error'}`);
+      }
+    };
+    closeFundFun();
+  }, [chainContracts, fundAddress]);
 
   const onSignChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const {value}: {value: string;} = event.target;
@@ -678,6 +707,15 @@ export default function FundPage({
               ) && (
                 <button onClick={refund}>
                   Refund
+                </button>
+              )}
+              {(
+                  (walletAddress?.toLowerCase() === fundData.worker.toLowerCase() ||
+                  walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) &&
+                  (fundData.status === 'active')
+              ) && (
+                <button onClick={closeFund}>
+                  Close
                 </button>
               )}
             </>
