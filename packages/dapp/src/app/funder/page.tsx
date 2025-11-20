@@ -38,7 +38,7 @@ export default function BrowseFunds() {
   }, [ChainContracts]);
 
   const loadAllFunds = async () => {
-    if (!ChainContracts) return;
+    if (!ChainContracts || !caipAddress) return;
     
     setIsLoading(true);
     try {
@@ -47,12 +47,20 @@ export default function BrowseFunds() {
       const { formatUnits } = await import('viem');
       const { APPKIT_WAGMI } = await import("@/cfg");
 
+      // Extract wallet address from CAIP address (format: "eip155:31337:0x...")
+      const walletAddress = caipAddress.split(':')[2] as `0x${string}`;
+      if (!walletAddress) {
+        setFunds([]);
+        setIsLoading(false);
+        return;
+      }
+
       // Get all funds from FundFactory
       const allFunds = await readContract(APPKIT_WAGMI.wagmiConfig, {
         address: ChainContracts.FundFactory.address,
         abi: ChainContracts.FundFactory.abi,
         functionName: 'instances',
-        args: [],
+        args: [], // Get all funds (no role filter)
       }) as `0x${string}`[];
 
       console.log('All funds for browse:', allFunds);
@@ -139,7 +147,7 @@ export default function BrowseFunds() {
   if (!isConnected) {
     return (
       <div className="text-center py-12">
-        <h1 className="mb-6">Browse Funds</h1>
+        <h1 className="mb-6">Funder Dashboard</h1>
         <p className="text-gray-600 mb-6">Connect your wallet to browse and fund campaigns</p>
         <ConnectButton />
       </div>
@@ -149,7 +157,7 @@ export default function BrowseFunds() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="mb-2">Browse Funds</h1>
+        <h1 className="mb-2">Funder Dashboard</h1>
         <p className="text-gray-600">Discover and support crowdfunding campaigns</p>
       </div>
 

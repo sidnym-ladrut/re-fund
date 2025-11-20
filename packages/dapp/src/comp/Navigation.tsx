@@ -26,14 +26,17 @@ export function Navigation() {
               re-fund
             </Link>
             <div className="hidden md:flex space-x-2">
-              <Link href="/browse" className={linkClass('/browse')}>
-                Browse Funds
+              <Link href="/tracker" className={linkClass('/tracker')}>
+                Global Browser
               </Link>
               <Link href="/dashboard/worker" className={linkClass('/dashboard/worker')}>
-                Worker Dashboard
+                Worker
               </Link>
               <Link href="/dashboard/oracle" className={linkClass('/dashboard/oracle')}>
-                Oracle Dashboard
+                Oracle
+              </Link>
+              <Link href="/funder" className={linkClass('/funder')}>
+                Funder
               </Link>
             </div>
           </div>

@@ -6,9 +6,11 @@ import Contracts from '@/../chain/contracts';
 export function useChainContracts(): Nullable<Record<string, any>> {
   const { address, isConnected, caipAddress } = useAppKitAccount();
 
-  return useMemo<Record<string, any> | null>(() => (
-    !isConnected ? null : Contracts[caipAddress.split(':')?.[1]]
-  ), [isConnected, caipAddress]);
+  return useMemo<Record<string, any> | null>(() => {
+    if (!isConnected || !caipAddress) return null;
+    const chainId = caipAddress.split(':')?.[1];
+    return chainId ? Contracts[chainId as unknown as keyof typeof Contracts] : null;
+  }, [isConnected, caipAddress]);
 }
 
 // export function useWalletMeta(): Nullable<WalletMeta> {

@@ -372,24 +372,68 @@ export default function FundPage({
   useEffect(() => {
     const queryIPFS = async () => {
       if (!!fundData) {
+        // Check if terms is a valid IPFS CID (starts with 'Qm' or 'baf')
+        const isValidCID = fundData.terms && (fundData.terms.startsWith('Qm') || fundData.terms.startsWith('baf'));
+        
+        console.log('IPFS Query:', { 
+          terms: fundData.terms, 
+          isValidCID, 
+          hasPinata: !!PINATA 
+        });
+        
+        if (!isValidCID || !PINATA) {
+          // If not a valid CID or Pinata not configured, just show the terms string
+          console.log('Skipping IPFS fetch - invalid CID or no Pinata');
+          setTermsData({ text: fundData.terms });
+          return;
+        }
+
         try {
+          console.log('Fetching from IPFS:', fundData.terms);
           const { data, contentType } = await PINATA.gateways.public.get(fundData.terms);
-          if (contentType === "application/json") {
-            if (data?.schema === "fund-plaintext" && data?.version === 0) {
+          console.log('IPFS Response:', { contentType, data });
+          console.log('Data type:', typeof data, 'Is array:', Array.isArray(data));
+          console.log('Full data:', JSON.stringify(data, null, 2));
+          
+          if (contentType === "application/json" && typeof data === 'object' && data !== null && !Array.isArray(data)) {
+            const jsonData = data as any;
+            console.log('JSON Data schema:', jsonData.schema, 'version:', jsonData.version);
+            console.log('JSON Data terms:', jsonData.terms);
+            
+            if (jsonData.schema === "fund-plaintext" && jsonData.version === 0) {
               const dataUrl = await PINATA.gateways.public.convert(fundData.terms);
               setTermsData({
-                text: data?.terms?.text ?? "",
+                text: jsonData?.terms?.text ?? "",
+                url: dataUrl,
+              });
+            } else if (jsonData.schema === "fund-milestones" && jsonData.version === 0) {
+              // Handle fund-milestones schema
+              const dataUrl = await PINATA.gateways.public.convert(fundData.terms);
+              const title = jsonData.meta?.title || "Untitled";
+              const summary = jsonData.meta?.summary || "";
+              const milestones = jsonData.meta?.milestones || [];
+              
+              // Format the milestones text
+              const milestonesList = milestones.map((m: any, idx: number) => {
+                return `${idx + 1}. ${m.terms} (Target: ${m.target})`;
+              }).join('\n');
+              
+              const termsText = `Title: ${title}\n\nSummary: ${summary}\n\nMilestones:\n${milestonesList}`;
+              
+              setTermsData({
+                text: termsText,
                 url: dataUrl,
               });
             } else {
               setTermsData({ text: fundData.terms });
             }
           } else {
+            // Not JSON or wrong format, just show the CID
             setTermsData({ text: fundData.terms });
           }
         } catch (err: any) {
           console.error('Unable to fetch terms:', err);
-          setTermsData({});
+          setTermsData({ text: fundData.terms });
         }
       }
     };
@@ -432,7 +476,7 @@ export default function FundPage({
                       </li>
                       <li>
                         <strong>Supply: </strong>
-                        {formatNumber(formatUnits(tokenData.supply, tokenData.decimals))} {tokenData.symbol}
+                        {formatNumber(formatUnits(tokenData.supply, Number(tokenData.decimals)))} {tokenData.symbol}
                       </li>
                     </ul>
                   )}
@@ -447,23 +491,19 @@ export default function FundPage({
                 <>
                   <p>
                     <strong>Reference: </strong>
-                    {!termsData.url ? (
-                      <span>fundData.terms</span>
-                    ) : (
-                      <Link
-                        className="transition-colors duration-200 hover:bg-gray-100"
-                        href={termsData.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {fundData.terms}
-                      </Link>
-                    )}
+                    <Link
+                      className="transition-colors duration-200 hover:bg-gray-100 underline"
+                      href={termsData.url || `https://gateway.pinata.cloud/ipfs/${fundData.terms}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {fundData.terms}
+                    </Link>
                   </p>
                   {!termsData?.text ? (
                     <p className="italic">Extended IPFS Data Unavailable</p>
                   ) : (
-                    <p>{termsData.text}</p>
+                    <p className="whitespace-pre-line">{termsData.text}</p>
                   )}
                 </>
               )}
@@ -500,7 +540,6 @@ export default function FundPage({
                     className="border-black border-1 px-2 py-1"
                     type="number"
                     step="0.0001"
-                    step="0.0001"
                     value={funderDepo}
                     onChange={onDepoChange}
                     placeholder="10"
@@ -520,7 +559,6 @@ export default function FundPage({
                   <input
                     className="border-black border-1 px-2 py-1"
                     type="number"
-                    step="0.0001"
                     step="0.0001"
                     value={workerWith}
                     onChange={onWithChange}
