@@ -47,6 +47,9 @@ export default function WorkerDashboard() {
 
     setIsLoading(true);
     try {
+      console.log('Worker Dashboard - Connected wallet address:', walletAddress);
+      console.log('Worker Dashboard - CAIP address:', caipAddress);
+      
       // Filter funds where this wallet is the worker
       const workerFunds: `0x${string}`[] = await readContract(APPKIT_WAGMI.wagmiConfig, {
         address: ChainContracts.FundFactory.address,
@@ -55,7 +58,7 @@ export default function WorkerDashboard() {
         args: [walletAddress, 0],
       }) as `0x${string}`[];
 
-      console.log('Found worker funds:', workerFunds);
+      console.log('Found worker funds for', walletAddress, ':', workerFunds);
 
       // Load details for each fund
       const fundDetails = await Promise.all(
@@ -175,7 +178,7 @@ export default function WorkerDashboard() {
             {funds.map((fund) => (
               <Card
                 key={fund.address}
-                onClick={() => router.push(`/fund/${fund.address}`)}
+                onClick={() => router.push(`/browser/${fund.address}`)}
                 className="hover:border-black cursor-pointer"
               >
                 <div className="space-y-3">
@@ -270,8 +273,27 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
         throw new Error('Oracle cut must be between 0 and 100%');
       }
 
-      // FIXME: Upload to IPFS and get Content ID
-      const terms = formData.terms;
+      // Upload terms to IPFS via Pinata API route
+      const termsJson = {
+        schema: "fund-plaintext",
+        version: 0,
+        terms: { text: formData.terms },
+      };
+
+      console.log('Uploading terms to IPFS...');
+      const uploadResponse = await fetch('/api/upload-terms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ termsData: termsJson }),
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(`Failed to upload terms: ${errorData.error || 'Unknown error'}`);
+      }
+
+      const { cid: terms } = await uploadResponse.json();
+      console.log('Terms uploaded, CID:', terms);
 
       console.log('Creating fund with:', {
         worker: walletAddress,
@@ -318,7 +340,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
 
       // Success! Close modal and redirect to fund
       onSuccess();
-      router.push(`/fund/${result}`);
+      router.push(`/browser/${result}`);
     } catch (err: any) {
       console.error('Error creating fund:', err);
       setError(err.message || 'Failed to create fund');
@@ -349,7 +371,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
           />
           <button
             type="button"
-            onClick={() => setFormData({ ...formData, oracle: walletAddress, oracleCut: '0' })}
+            onClick={() => setFormData({ ...formData, oracle: walletAddress || '', oracleCut: '0' })}
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 whitespace-nowrap text-sm"
             disabled={isSubmitting}
           >

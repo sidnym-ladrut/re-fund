@@ -46,6 +46,9 @@ export default function OracleDashboard() {
 
     setIsLoading(true);
     try {
+      console.log('Oracle Dashboard - Connected wallet address:', walletAddress);
+      console.log('Oracle Dashboard - CAIP address:', caipAddress);
+      
       // Filter funds where this wallet is the oracle
       const oracleFunds: `0x${string}`[] = await readContract(APPKIT_WAGMI.wagmiConfig, {
         address: ChainContracts.FundFactory.address,
@@ -54,7 +57,7 @@ export default function OracleDashboard() {
         args: [walletAddress, 1],
       }) as `0x${string}`[];
 
-      console.log('Found oracle funds:', oracleFunds);
+      console.log('Found oracle funds for', walletAddress, ':', oracleFunds);
 
       // Load details for each fund
       const fundDetails = await Promise.all(
@@ -184,7 +187,7 @@ export default function OracleDashboard() {
             {pendingFunds.map((fund) => (
               <Card
                 key={fund.address}
-                onClick={() => router.push(`/fund/${fund.address}`)}
+                onClick={() => router.push(`/browser/${fund.address}`)}
                 className="hover:border-black cursor-pointer"
               >
                 <div className="space-y-3">
@@ -206,7 +209,7 @@ export default function OracleDashboard() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(`/fund/${fund.address}`);
+                      router.push(`/browser/${fund.address}`);
                     }}
                     className="w-full mt-4"
                   >
@@ -233,7 +236,7 @@ export default function OracleDashboard() {
             {activeFunds.map((fund) => (
               <Card
                 key={fund.address}
-                onClick={() => router.push(`/fund/${fund.address}`)}
+                onClick={() => router.push(`/browser/${fund.address}`)}
                 className="hover:border-black cursor-pointer"
               >
                 <div className="space-y-3">

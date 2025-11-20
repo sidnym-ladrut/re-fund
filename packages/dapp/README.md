@@ -9,7 +9,8 @@ This is a Next.js project.
 3. Rename `.env.example` to `.env` and paste your `Project ID` as the value for
    `NEXT_PUBLIC_PROJECT_ID`
 4. Sign up for [Pinata](https://pinata.cloud) and copy your gateway url to
-   `NEXT_PUBLIC_GATEWAY_URL` and your JWT key to `NEXT_PUBLIC_PINATA_JWT`.
+   `NEXT_PUBLIC_GATEWAY_URL` and your JWT key to `NEXT_PUBLIC_PINATA_JWT` (be
+   sure to generate an admin key!).
 4. Run `npm install` to install dependencies
 5. Run `npm run dev` to start the development server
 

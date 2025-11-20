@@ -20,3 +20,6 @@ dist
 # documentation (work in progress)
 docs/chain/
 docs/frontend/
+
+# slither
+packages/chain/venv
