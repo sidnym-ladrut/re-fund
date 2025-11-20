@@ -5,6 +5,7 @@ import {IFund} from "./IFund.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
@@ -14,7 +15,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 /// @title Fund
 /// @notice A treasury contract that manages payouts to a worker (the owner) with the approval of an oracle (the assessor) with ERC20 donations from funders (any donor)
 /// @author ~sidnym-ladrut -- DM on Urbit for more details
-contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
+contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable, ReentrancyGuardUpgradeable {
   ///////////////
   // Constants //
   ///////////////
@@ -100,6 +101,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   constructor() initializer {
     __Ownable_init(msg.sender);
     __EIP712_init("Fund", "1");
+    __ReentrancyGuard_init();
     oracle = msg.sender;
   }
 
@@ -153,7 +155,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @param deadline The last permitted block time for the signed deposit (as a Unix epoch value)
   /// @param funderSignature An ERC20Permit signature from {funder} authorizing {amount} of {token} to be transferred
   function deposit(ERC20Permit token, address funder, uint256 amount, uint256 deadline, bytes memory funderSignature)
-      public afterLocked beforeClosed {
+      public afterLocked beforeClosed nonReentrant {
     // TODO: Remove when multiple token types are supported
     require(token == payoutToken, "Only deposits in the contract's payout token are currently accepted");
 
@@ -189,7 +191,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @param amount The amount of {payoutToken} that will be withdrawn
   /// @param oracleSignature An EIP-712 signature from the {oracle} authorizing an {amount} transfer to {worker}
   function withdraw(uint256 amount, bytes memory oracleSignature)
-      public onlyOwner afterLocked {
+      public onlyOwner afterLocked nonReentrant {
     require(amount > 0, "Must withdraw a non-zero sum");
     require(amount <= funds(), "Overdraft on the existing funds");
 
@@ -210,7 +212,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
 
   /// @notice Refunds all unclaimed tokens in this fund to their respective funders
   /// @dev Refunds are proportional to (1) the funder's funding amount since fund activation or prior refund and (2) the remaining funds in this contract
-  function refund() public onlyManager afterLocked {
+  function refund() public onlyManager afterLocked nonReentrant {
     uint256 fundsRegistered_ = fundsRegistered();
     uint256 fundsRemaining = (fundsRegistered_ - _withdrawn);
     require(fundsRemaining > 0, "Must refund a non-zero sum");
