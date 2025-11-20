@@ -69,6 +69,22 @@ abstract contract FundBaseTest is Test {
     _fundFactory = new FundFactory(_fundImplementation);
   }
 
+  function _closeAs(Fund fund, address closer) internal {
+    vm.prank(closer);
+    fund.close();
+  }
+
+  function _refundAs(Fund fund, address refunder) internal {
+    vm.prank(refunder);
+    fund.refund();
+  }
+
+  function _withdrawFrom(Fund fund, uint256 amount) internal {
+    bytes memory oracleWithdrawalSignature = _signAs(fund.oracle(), fund.hashWithdraw(amount));
+    vm.prank(fund.worker());
+    fund.withdraw(amount, oracleWithdrawalSignature);
+  }
+
   function _fundAs(Fund fund, address funder, uint256 amount) internal {
     bytes32 hashPermit = _fundToken.hashPermit(funder, address(fund), amount, BLOCK_PERMIT_TIME);
     bytes memory signature = _signAs(funder, hashPermit);

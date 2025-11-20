@@ -12,6 +12,13 @@ interface IFund {
   // Types/Enums //
   /////////////////
 
+  /// @notice Identifiers for the different states a fund can be in
+  enum Status {
+    Pending,
+    Active,
+    Closed
+  }
+
   /// @notice Identifiers for the different roles an account can have in a fund
   enum Role {
     Worker,

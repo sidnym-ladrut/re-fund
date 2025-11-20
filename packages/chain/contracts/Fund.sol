@@ -44,7 +44,9 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @notice The terms of the work for this fund (generally stored as the IPFS CID of the JSON file)
   string public terms;
   /// @notice The nonce for the next withdrawal
-  uint8 public nonce;
+  uint256 public nonce;
+  /// @notice The flag for if a fund has been terminated
+  bool public closed;
   /// @notice The total amount of value withdrawn from this fund
   uint256 private _withdrawn;
 
@@ -80,6 +82,12 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @notice Constrains the call time to after {lockTerms} is called
   modifier afterLocked() {
     require(termsSignature.length == 65, "Fund terms are not yet locked");
+    _;
+  }
+
+  /// @notice Constrains the call time to before {close} is called
+  modifier beforeClosed() {
+    require(!closed, "Fund has already been closed");
     _;
   }
 
@@ -145,8 +153,8 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @param deadline The last permitted block time for the signed deposit (as a Unix epoch value)
   /// @param funderSignature An ERC20Permit signature from {funder} authorizing {amount} of {token} to be transferred
   function deposit(ERC20Permit token, address funder, uint256 amount, uint256 deadline, bytes memory funderSignature)
-      public afterLocked {
-    // TODO: Remove
+      public afterLocked beforeClosed {
+    // TODO: Remove when multiple token types are supported
     require(token == payoutToken, "Only deposits in the contract's payout token are currently accepted");
 
     bytes32 r;
@@ -201,17 +209,15 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   }
 
   /// @notice Refunds all unclaimed tokens in this fund to their respective funders
-  /// @dev Refunds are proportional to (1) the funder's funding amount and (2) the remaining funds in this contract
+  /// @dev Refunds are proportional to (1) the funder's funding amount since fund activation or prior refund and (2) the remaining funds in this contract
   function refund() public onlyManager afterLocked {
-    // TODO: Close out the fund (set a flag using an existing variable)
-    // TODO: Any per-token remainder should be sent to the oracle
     uint256 fundsRegistered_ = fundsRegistered();
     uint256 fundsRemaining = (fundsRegistered_ - _withdrawn);
     require(fundsRemaining > 0, "Must refund a non-zero sum");
 
-    uint256 fundsRefunded = 0;
     for (uint256 i = 0; i < treasuryTokens.length; i++) {
       ERC20Permit token = treasuryTokens[i];
+      uint256 tokensRefunded = 0;
       for (uint256 j = 0; j < treasuryFunders.length; j++) {
         address funder = treasuryFunders[j];
 
@@ -219,12 +225,24 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
         if (funderTokenSum > 0) {
           uint256 funderTokenRefund = (funderTokenSum * fundsRemaining) / fundsRegistered_;
           token.transfer(funder, funderTokenRefund);
-          fundsRefunded += funderTokenRefund;
+          tokensRefunded += funderTokenRefund;
         }
+        _treasury[token][funder] = 0;
+      }
+
+      uint256 tokensLeftover = token.balanceOf(address(this));
+      if (tokensLeftover > 0) {
+        token.transfer(oracle, tokensLeftover);
       }
     }
+    _withdrawn = 0;
 
-    emit Refund(msg.sender, fundsRefunded);
+    emit Refund(msg.sender, fundsRemaining);
+  }
+
+  /// @notice Closes a fund to any more donations (e.g. when work is complete)
+  function close() public onlyManager afterLocked beforeClosed {
+    closed = true;
   }
 
   /// @notice Alias for {fundsAvailable}
@@ -252,6 +270,16 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
       }
     }
     return amount;
+  }
+
+  /// @notice Returns the active {Status} for a fund
+  /// @return stat The current status of a fund: pending (created & not locked), active (locked & not closed), or closed (done)
+  function status() public view returns (Status stat) {
+    return closed
+      ? Status.Closed
+      : (termsSignature.length == 0)
+        ? Status.Pending
+        : Status.Active;
   }
 
   //////////////////////
