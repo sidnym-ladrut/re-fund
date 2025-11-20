@@ -1,6 +1,6 @@
 {
   "name": "@re-fund/dapp",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "description": "The off-chain component (web front-end and back-end) of the 're-fund' application.",
   "license": "GPL-3.0-or-later",
