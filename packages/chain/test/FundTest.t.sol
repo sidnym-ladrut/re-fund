@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.28;
 
-import {console} from "forge-std/console.sol";
+// import {console} from "forge-std/console.sol";
 import {FundBaseTest} from "./FundBaseTest.sol";
 import {IFund} from "../contracts/IFund.sol";
 import {Fund} from "../contracts/Fund.sol";

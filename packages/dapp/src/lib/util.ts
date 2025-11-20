@@ -1,9 +1,25 @@
+import { FundStatus } from "@/type";
+
+export function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export function trimAddress(address: `0x${string}`): `0x${string}` {
   return `${address.slice(0, 5)}…${address.slice(-4)}`;
 }
 
 export function formatNumber(x: string): string {
-    return x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
+  return x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
+}
+
+export function parseStatus(s: number): FundStatus {
+  if (s === 0) {
+    return 'pending';
+  } else if (s === 1) {
+    return 'active';
+  } else {
+    return 'closed';
+  }
 }
 
 export function nextPermitTime(): bigint {

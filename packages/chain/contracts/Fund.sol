@@ -237,6 +237,8 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable, Re
         token.transfer(oracle, tokensLeftover);
       }
     }
+
+    // NOTE: Reset proportional deposits on refund
     _withdrawn = 0;
 
     emit Refund(msg.sender, fundsRemaining);

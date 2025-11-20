@@ -3,7 +3,9 @@ import { readContract, getPublicClient, watchContractEvent } from '@wagmi/core';
 import { parseAbiItem, type Address } from 'viem';
 import { useEffect } from 'react';
 import { useChainContracts } from './wallet';
+import { parseStatus } from "@/lib/util";
 import { APPKIT_WAGMI } from '@/cfg';
+import { FundStatus } from "@/type";
 
 // Types
 export interface FundStaticData {
@@ -13,7 +15,7 @@ export interface FundStaticData {
   oracleCut: bigint;
   payoutToken: Address;
   termsCID: string;
-  locked: boolean;
+  status: FundStatus;
 }
 
 export interface TokenData {
@@ -80,7 +82,7 @@ export function useFundStaticData(fundAddress: Address | null) {
     queryFn: async () => {
       if (!chainContracts || !fundAddress) throw new Error('Missing dependencies');
 
-      const [worker, oracle, oracleCut, payoutToken, terms, termsSignature] = await Promise.all([
+      const [worker, oracle, oracleCut, payoutToken, terms, status] = await Promise.all([
         readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundAddress,
           abi: chainContracts.Fund.abi,
@@ -114,7 +116,7 @@ export function useFundStaticData(fundAddress: Address | null) {
         readContract(APPKIT_WAGMI.wagmiConfig, {
           address: fundAddress,
           abi: chainContracts.Fund.abi,
-          functionName: 'termsSignature',
+          functionName: 'status',
           args: [],
         }),
       ]);
@@ -126,7 +128,7 @@ export function useFundStaticData(fundAddress: Address | null) {
         oracleCut: oracleCut as bigint,
         payoutToken: payoutToken as Address,
         termsCID: terms as string,
-        locked: (termsSignature as string) !== '0x',
+        status: parseStatus(status),
       } as FundStaticData;
     },
     enabled: !!chainContracts && !!fundAddress,

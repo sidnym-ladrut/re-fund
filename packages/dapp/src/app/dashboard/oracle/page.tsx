@@ -9,7 +9,9 @@ import { Card } from "@/comp/Card";
 import { StatusBadge } from "@/comp/StatusBadge";
 import { Address } from "@/comp/Address";
 import { formatNumber } from "@/lib/util";
+import { parseStatus } from "@/lib/util";
 import { APPKIT_WAGMI } from "@/cfg";
+import { FundStatus } from "@/type";
 import Contracts from '@/../chain/contracts';
 
 interface Fund {
@@ -18,7 +20,7 @@ interface Fund {
   oracle: `0x${string}`;
   token: `0x${string}`;
   oracleCut: bigint;
-  isLocked: boolean;
+  status: FundStatus;
   fundsAvailable: bigint;
 }
 
@@ -48,7 +50,7 @@ export default function OracleDashboard() {
     try {
       console.log('Oracle Dashboard - Connected wallet address:', walletAddress);
       console.log('Oracle Dashboard - CAIP address:', caipAddress);
-      
+
       // Filter funds where this wallet is the oracle
       const oracleFunds: `0x${string}`[] = await readContract(APPKIT_WAGMI.wagmiConfig, {
         address: ChainContracts.FundFactory.address,
@@ -63,7 +65,7 @@ export default function OracleDashboard() {
       const fundDetails = await Promise.all(
         oracleFunds.map(async (fundAddress) => {
           try {
-            const [worker, oracle, token, oracleCut, termsSignature, fundsAvailable] = await Promise.all([
+            const [worker, oracle, token, oracleCut, status, fundsAvailable] = await Promise.all([
               readContract(APPKIT_WAGMI.wagmiConfig, {
                 address: fundAddress,
                 abi: ChainContracts.Fund.abi,
@@ -91,9 +93,9 @@ export default function OracleDashboard() {
               readContract(APPKIT_WAGMI.wagmiConfig, {
                 address: fundAddress,
                 abi: ChainContracts.Fund.abi,
-                functionName: 'termsSignature',
+                functionName: 'status',
                 args: [],
-              }) as Promise<string>,
+              }) as Promise<number>,
               readContract(APPKIT_WAGMI.wagmiConfig, {
                 address: fundAddress,
                 abi: ChainContracts.Fund.abi,
@@ -102,15 +104,13 @@ export default function OracleDashboard() {
               }) as Promise<bigint>,
             ]);
 
-            const isLocked = termsSignature && termsSignature !== '0x';
-
             return {
               address: fundAddress,
               worker,
               oracle,
               token,
               oracleCut,
-              isLocked,
+              status: parseStatus(status),
               fundsAvailable,
             };
           } catch (error) {
@@ -123,8 +123,8 @@ export default function OracleDashboard() {
       const validFunds = fundDetails.filter((fund): fund is Fund => fund !== null);
 
       // Separate pending (not locked) from active (locked) funds
-      const pending = validFunds.filter(fund => !fund.isLocked);
-      const active = validFunds.filter(fund => fund.isLocked);
+      const pending = validFunds.filter(fund => (fund.status === 'pending'));
+      const active = validFunds.filter(fund => (fund.status === 'active'));
 
       setPendingFunds(pending);
       setActiveFunds(active);

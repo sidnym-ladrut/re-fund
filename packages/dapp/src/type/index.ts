@@ -8,6 +8,8 @@ export type Address = `0x${string}`;
 export type AddressType = 'account' | 'transaction' | 'signature';
 export type ChainAddress = `${string}:${Address}`;
 
+export type FundStatus = 'pending' | 'active' | 'closed';
+
 // export interface WalletMeta {
 //   connected: boolean;
 //   address: Address;
