@@ -231,6 +231,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
     oracle: '',
     oracleCut: '',
     token: '',
+    title: '',
     terms: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -272,7 +273,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
       const termsJson = {
         schema: "fund-plaintext",
         version: 0,
-        terms: { text: formData.terms },
+        terms: { title: formData.title, text: formData.terms },
       };
 
       console.log('Uploading terms to IPFS...');
@@ -425,13 +426,21 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Project Terms & Milestones</label>
+        <label className="block text-sm font-medium mb-2">Project Title & Terms</label>
+        <input
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+          placeholder="Entitle your project"
+          className="w-full px-4 py-2 border-2 border-gray-300 rounded-md focus:border-black outline-none"
+          required
+          disabled={isSubmitting}
+        />
         <textarea
           value={formData.terms}
           onChange={(e) => setFormData({ ...formData, terms: e.target.value })}
           placeholder="Describe your project, milestones, and deliverables..."
           rows={6}
-          className="w-full px-4 py-2 border-2 border-gray-300 rounded-md focus:border-black outline-none"
+          className="w-full mt-1 px-4 py-2 border-2 border-gray-300 rounded-md focus:border-black outline-none"
           required
           disabled={isSubmitting}
         />

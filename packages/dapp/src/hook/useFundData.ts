@@ -3,8 +3,8 @@ import { readContract, getPublicClient, watchContractEvent } from '@wagmi/core';
 import { parseAbiItem, type Address } from 'viem';
 import { useEffect } from 'react';
 import { useChainContracts } from './wallet';
-import { parseStatus } from "@/lib/util";
-import { APPKIT_WAGMI } from '@/cfg';
+import { parseStatus, isObject } from "@/lib/util";
+import { APPKIT_WAGMI, PINATA } from "@/cfg";
 import { FundStatus } from "@/type";
 
 // Types
@@ -16,6 +16,13 @@ export interface FundStaticData {
   payoutToken: Address;
   terms: string;
   status: FundStatus;
+}
+
+export interface TermsData {
+  cid: string;
+  text: string;
+  url?: string;
+  title?: string;
 }
 
 export interface TokenData {
@@ -133,6 +140,56 @@ export function useFundStaticData(fundAddress: Address | null) {
     },
     enabled: !!chainContracts && !!fundAddress,
     staleTime: 60000, // Cache for 1 minute (static data doesn't change often)
+  });
+}
+
+export function useTermsData(termsCid: string | null) {
+  return useQuery({
+    queryKey: ['terms', termsCid],
+    queryFn: async () => {
+      if (!termsCid) throw new Error('Missing dependencies');
+
+      let termsData: TermsData = { cid: termsCid, text: termsCid };
+      try {
+        const { data, contentType: mime } = await PINATA.gateways.public.get(termsCid);
+        if (mime === "application/json" && isObject(data)) {
+          const dataUrl = await PINATA.gateways.public.convert(termsCid);
+          termsData.url = dataUrl;
+
+          const jsonData = data as any;
+          if (jsonData?.schema === "fund-plaintext" && jsonData?.version === 0) {
+            termsData = {
+              ...termsData,
+              title: jsonData?.terms?.title,
+              text: jsonData?.terms?.text ?? termsData.text,
+            };
+          } else if (jsonData?.schema === "fund-milestones" && jsonData?.version === 0) {
+            const summary = jsonData.meta?.summary;
+            const milestones = jsonData.meta?.milestones || [];
+            // Format the milestones text
+            const milestonesList = milestones.map((m: any, idx: number) => {
+              return `${idx + 1}. ${m.terms} (Target: ${m.target})`;
+            }).join('\n');
+
+            const termsText = `${
+              !summary ? '' : `${`Summary: ${summary}\n\n`}`
+            }Milestones:\n${milestonesList}`;
+
+            termsData = {
+              ...termsData,
+              title: jsonData.meta?.title,
+              text: termsText,
+            };
+          }
+        }
+      } catch (err: any) {
+        console.error('Unable to fetch terms:', err);
+      }
+
+      return termsData;
+    },
+    enabled: !!termsCid,
+    staleTime: 300000, // Cache for 5 minute (static data doesn't change often)
   });
 }
 

@@ -12,6 +12,10 @@ export function formatNumber(x: string): string {
   return x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
 }
 
+export function isObject(v: any): boolean {
+  return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
 export function parseStatus(s: number): FundStatus {
   if (s === 0) {
     return 'pending';

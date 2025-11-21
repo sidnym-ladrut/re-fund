@@ -13,30 +13,10 @@ import { StatusBadge } from '@/comp/StatusBadge';
 import { formatNumber, nextPermitTime } from "@/lib/util";
 import { useChainContracts } from "@/hook/wallet";
 import { simulateContract, writeContract } from '@wagmi/core'
+import { useFundStaticData, useTokenData, useTermsData } from "@/hook/useFundData";
 import { parseStatus } from "@/lib/util";
 import { FundStatus } from "@/type";
 import { APPKIT_WAGMI, PINATA } from "@/cfg";
-
-interface FundData {
-  worker: `0x${string}`;
-  oracle: `0x${string}`;
-  token: `0x${string}`;
-  terms: string;
-  status: FundStatus;
-}
-
-interface TermsData {
-  title?: string;
-  text?: string;
-  url?: string;
-}
-
-interface TokenData {
-  name: string;
-  symbol: string;
-  supply: bigint;
-  decimals: bigint;
-}
 
 function assertValidAddress(value: string): asserts value is `0x${string}` {
   if (!/^0x[a-fA-F0-9]{40}$/.test(value)) {
@@ -55,9 +35,12 @@ export default function FundPage({
   const { address: walletAddress, isConnected, caipAddress } = useAppKitAccount();
   const { signTypedDataAsync: signData } = useSignTypedData();
   const chainContracts = useChainContracts();
-  const [fundData, setFundData] = useState<FundData | undefined>(undefined);
-  const [termsData, setTermsData] = useState<TermsData | undefined>(undefined);
-  const [tokenData, setTokenData] = useState<TokenData | undefined>(undefined);
+
+  const { data: fundData, isLoading: isFundLoading, isPending: isFundPending } = useFundStaticData(fundAddress);
+  const { data: termsData, isLoading: isTermsLoading } = useTermsData(fundData?.terms);
+  const { data: tokenData , isLoading: isTokenLoading } = useTokenData(fundData?.payoutToken);
+
+  const [fundTokenSupply, setFundTokenSupply] = useState<bigint>(0n);
   const [oracleSign, setOracleSign] = useState<string>("");
   const [funderDepo, setFunderDepo] = useState<string>("");
   const [workerWith, setWorkerWith] = useState<string>("");
@@ -68,39 +51,41 @@ export default function FundPage({
 
   const signOff = useCallback(() => {
     const signOffFun = async () => {
-      const signature = await signData({
-        account: walletAddress,
-        domain: {
-          name: 'Fund',
-          version: '1',
-          chainId: chainId,
-          verifyingContract: fundAddress,
-        },
-        types: {
-          SignTerms: [
-            { name: 'terms', type: 'bytes32' },
-          ],
-        },
-        primaryType: 'SignTerms',
-        message: {
-          terms: keccak256(fundData?.terms),
-        },
-      });
+      if (!isFundLoading && !!fundData) {
+        const signature = await signData({
+          account: walletAddress,
+          domain: {
+            name: 'Fund',
+            version: '1',
+            chainId: chainId,
+            verifyingContract: fundAddress,
+          },
+          types: {
+            SignTerms: [
+              { name: 'terms', type: 'bytes32' },
+            ],
+          },
+          primaryType: 'SignTerms',
+          message: {
+            terms: keccak256(fundData.terms),
+          },
+        });
 
-      // Save signature to localStorage for this fund
-      const storageKey = `fund-signature-${fundAddress.toLowerCase()}`;
-      localStorage.setItem(storageKey, signature);
+        // Save signature to localStorage for this fund
+        const storageKey = `fund-signature-${fundAddress.toLowerCase()}`;
+        localStorage.setItem(storageKey, signature);
 
-      if (walletAddress.toLowerCase() === fundData?.worker?.toLowerCase()) {
-        // Auto-fill the signature input field
-        setOracleSign(signature);
-        alert("Signature generated and filled! You can now click 'Lock In' to activate the fund.");
-      } else {
-        alert(`Signature saved! The worker can now lock the fund.\n\nSignature: ${signature}`);
+        if (walletAddress.toLowerCase() === fundData.worker.toLowerCase()) {
+          // Auto-fill the signature input field
+          setOracleSign(signature);
+          alert("Signature generated and filled! You can now click 'Lock In' to activate the fund.");
+        } else {
+          alert(`Signature saved! The worker can now lock the fund.\n\nSignature: ${signature}`);
+        }
       }
     };
     signOffFun();
-  }, [walletAddress, chainId, fundData, fundAddress, signData]);
+  }, [walletAddress, chainId, fundData, isFundLoading, fundAddress, signData]);
   const lockIn = useCallback(() => {
     const lockInFun = async () => {
       const { request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
@@ -121,7 +106,7 @@ export default function FundPage({
   }, [oracleSign, chainContracts, fundAddress]);
   const deposit = useCallback(() => {
     const depositFun = async () => {
-      if (!chainContracts || !fundData || !tokenData || !walletAddress) {
+      if (isFundLoading || isTokenLoading || !chainContracts || !fundData || !tokenData || !walletAddress) {
         alert('Please ensure wallet is connected and data is loaded');
         return;
       }
@@ -130,7 +115,7 @@ export default function FundPage({
         const depoTime: bigint = nextPermitTime();
         const depoAmount: bigint = parseUnits(funderDepo, Number(tokenData.decimals));
         const depoNonce: bigint = (await readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundData.token,
+          address: fundData.payoutToken,
           abi: chainContracts.FundToken.abi,
           functionName: 'nonces',
           args: [walletAddress],
@@ -142,7 +127,7 @@ export default function FundPage({
             name: tokenData.name,
             version: '1',
             chainId: chainId,
-            verifyingContract: fundData.token,
+            verifyingContract: fundData.payoutToken,
           },
           types: {
             Permit: [
@@ -167,7 +152,7 @@ export default function FundPage({
           address: fundAddress,
           abi: chainContracts.Fund.abi,
           functionName: 'deposit',
-          args: [fundData.token, walletAddress as `0x${string}`, depoAmount, depoTime, signature],
+          args: [fundData.payoutToken, walletAddress as `0x${string}`, depoAmount, depoTime, signature],
         });
 
         const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
@@ -180,10 +165,10 @@ export default function FundPage({
       }
     };
     depositFun();
-  }, [walletAddress, chainId, funderDepo, fundData, tokenData, chainContracts, signData, fundAddress]);
+  }, [walletAddress, chainId, isFundLoading, isTokenLoading, funderDepo, fundData, tokenData, chainContracts, signData, fundAddress]);
   const signWithdrawal = useCallback(() => {
     const signWithdrawalFun = async () => {
-      if (!chainContracts || !tokenData || !walletAddress) {
+      if (!chainContracts || isTokenLoading || !tokenData || !walletAddress) {
         alert('Please ensure wallet is connected and data is loaded');
         return;
       }
@@ -243,10 +228,10 @@ export default function FundPage({
       }
     };
     signWithdrawalFun();
-  }, [walletAddress, chainId, workerWith, fundData, tokenData, chainContracts, fundAddress, signData]);
+  }, [walletAddress, chainId, isTokenLoading, workerWith, fundData, tokenData, chainContracts, fundAddress, signData]);
   const execWithdrawal = useCallback(() => {
     const execWithdrawalFun = async () => {
-      if (!chainContracts || !tokenData || !oracleSign) {
+      if (!chainContracts || isTokenLoading || !tokenData || !oracleSign) {
         alert('Please ensure oracle has signed the withdrawal');
         return;
       }
@@ -290,7 +275,7 @@ export default function FundPage({
       }
     };
     execWithdrawalFun();
-  }, [chainContracts, tokenData, workerWith, oracleSign, fundAddress]);
+  }, [chainContracts, tokenData, isTokenLoading, workerWith, oracleSign, fundAddress]);
   const refund = useCallback(() => {
     const refundFun = async () => {
       if (!chainContracts) {
@@ -350,109 +335,9 @@ export default function FundPage({
     closeFundFun();
   }, [chainContracts, fundAddress]);
 
-  const onSignChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const {value}: {value: string;} = event.target;
-    setOracleSign(value);
-  }, [setOracleSign]);
-  const onDepoChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const {value}: {value: string;} = event.target;
-    setFunderDepo(value);
-  }, [setFunderDepo]);
-  const onWithChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
-    const {value}: {value: string;} = event.target;
-    setWorkerWith(value);
-  }, [setWorkerWith]);
-
-  useEffect(() => {
-    if (!!chainContracts) {
-      Promise.all([
-        readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundAddress,
-          abi: chainContracts.Fund.abi,
-          functionName: 'worker',
-          args: [],
-        }),
-        readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundAddress,
-          abi: chainContracts.Fund.abi,
-          functionName: 'oracle',
-          args: [],
-        }),
-        readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundAddress,
-          abi: chainContracts.Fund.abi,
-          functionName: 'payoutToken',
-          args: [],
-        }),
-        readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundAddress,
-          abi: chainContracts.Fund.abi,
-          functionName: 'terms',
-          args: [],
-        }),
-        readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundAddress,
-          abi: chainContracts.Fund.abi,
-          functionName: 'status',
-          args: [],
-        }),
-      ]).then(([worker, oracle, token, terms, status]) => {
-        setFundData({worker, oracle, token, terms, status: parseStatus(status)});
-
-        // If fund is not locked and user is the worker, try to load saved signature
-        if (status === "pending" && walletAddress?.toLowerCase() === worker.toLowerCase()) {
-          const storageKey = `fund-signature-${fundAddress.toLowerCase()}`;
-          const savedSignature = localStorage.getItem(storageKey);
-          if (savedSignature) {
-            setOracleSign(savedSignature);
-            console.log('Loaded saved oracle signature from localStorage');
-          }
-        }
-      }).catch((error) => {
-        console.log(error);
-      });
-    }
-  }, [fundAddress, chainContracts]);
-
-  useEffect(() => {
-    if (!!chainContracts && !!fundData) {
-      Promise.all([
-        readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundData.token,
-          abi: chainContracts.FundToken.abi,
-          functionName: 'name',
-          args: [],
-        }),
-        readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundData.token,
-          abi: chainContracts.FundToken.abi,
-          functionName: 'symbol',
-          args: [],
-        }),
-        readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundData.token,
-          abi: chainContracts.FundToken.abi,
-          functionName: 'balanceOf',
-          args: [fundAddress],
-        }),
-        readContract(APPKIT_WAGMI.wagmiConfig, {
-          address: fundData.token,
-          abi: chainContracts.FundToken.abi,
-          functionName: 'decimals',
-          args: [],
-        }),
-      ]).then(([name, symbol, supply, decimals]) => {
-        setTokenData({name, symbol, supply, decimals});
-      }).catch((error) => {
-        console.log(error);
-      });
-    }
-  }, [chainContracts, fundAddress, fundData]);
-
-  // Load withdrawal signature if available
   useEffect(() => {
     const loadWithdrawalSignature = async () => {
-      if (!!chainContracts && !!fundData && (fundData.status !== 'pending') && walletAddress?.toLowerCase() === fundData.worker.toLowerCase()) {
+      if (!!chainContracts && !isFundLoading && !!fundData && (fundData.status !== 'pending') && walletAddress?.toLowerCase() === fundData.worker.toLowerCase()) {
         try {
           const nonce = await readContract(APPKIT_WAGMI.wagmiConfig, {
             address: fundAddress,
@@ -481,87 +366,26 @@ export default function FundPage({
       }
     };
     loadWithdrawalSignature();
-  }, [chainContracts, fundAddress, fundData, walletAddress]);
-
+  }, [chainContracts, fundAddress, fundData, isFundLoading, walletAddress]);
   useEffect(() => {
-    const queryIPFS = async () => {
-      if (!!fundData) {
-        // Check if terms is a valid IPFS CID (starts with 'Qm' or 'baf')
-        const isValidCID = fundData.terms && (fundData.terms.startsWith('Qm') || fundData.terms.startsWith('baf'));
-
-        console.log('IPFS Query:', {
-          terms: fundData.terms,
-          isValidCID,
-          hasPinata: !!PINATA,
-        });
-
-        if (!isValidCID || !PINATA) {
-          // If not a valid CID or Pinata not configured, just show the terms string
-          console.log('Skipping IPFS fetch - invalid CID or no Pinata');
-          setTermsData({ text: fundData.terms });
-          return;
-        }
-
-        try {
-          console.log('Fetching from IPFS:', fundData.terms);
-          const { data, contentType } = await PINATA.gateways.public.get(fundData.terms);
-          console.log('IPFS Response:', { contentType, data });
-          console.log('Data type:', typeof data, 'Is array:', Array.isArray(data));
-          console.log('Full data:', JSON.stringify(data, null, 2));
-
-          if (contentType === "application/json" && typeof data === 'object' && data !== null && !Array.isArray(data)) {
-            const jsonData = data as any;
-            console.log('JSON Data schema:', jsonData.schema, 'version:', jsonData.version);
-            console.log('JSON Data terms:', jsonData.terms);
-
-            if (jsonData.schema === "fund-plaintext" && jsonData.version === 0) {
-              const dataUrl = await PINATA.gateways.public.convert(fundData.terms);
-              setTermsData({
-                title: jsonData?.terms?.title ?? "",
-                text: jsonData?.terms?.text ?? "",
-                url: dataUrl,
-              });
-            } else if (jsonData.schema === "fund-milestones" && jsonData.version === 0) {
-              // Handle fund-milestones schema
-              const dataUrl = await PINATA.gateways.public.convert(fundData.terms);
-              const title = jsonData.meta?.title || "Untitled";
-              const summary = jsonData.meta?.summary || "";
-              const milestones = jsonData.meta?.milestones || [];
-
-              // Format the milestones text
-              const milestonesList = milestones.map((m: any, idx: number) => {
-                return `${idx + 1}. ${m.terms} (Target: ${m.target})`;
-              }).join('\n');
-
-              const termsText = `Title: ${title}\n\nSummary: ${summary}\n\nMilestones:\n${milestonesList}`;
-
-              setTermsData({
-                title: title,
-                text: termsText,
-                url: dataUrl,
-              });
-            } else {
-              setTermsData({ text: fundData.terms });
-            }
-          } else {
-            // Not JSON or wrong format, just show the CID
-            setTermsData({ text: fundData.terms });
-          }
-        } catch (err: any) {
-          console.error('Unable to fetch terms:', err);
-          setTermsData({ text: fundData.terms });
-        }
-      }
+    if (!!chainContracts && !isFundLoading && !!fundData) {
+      readContract(APPKIT_WAGMI.wagmiConfig, {
+        address: fundData.payoutToken,
+        abi: chainContracts.FundToken.abi,
+        functionName: 'balanceOf',
+        args: [fundAddress],
+      }).then(setFundTokenSupply);
     };
-    queryIPFS();
-  }, [fundData, setTermsData]);
+  }, [chainContracts, setFundTokenSupply, fundAddress, fundData, isFundLoading]);
 
   return (
     <div className="flex flex-col gap-y-4">
       <h2>Fund @ <Address address={fundAddress} /></h2>
       <div className="flex flex-col gap-y-2">
-        {!fundData ? (
+        {(isFundLoading || isFundPending) ? (
           <span>Loading...</span>
+        ) : (!fundData) ? (
+          <span>Error! Unable to load fund.</span>
         ) : (
           <>
             <>
@@ -581,7 +405,7 @@ export default function FundPage({
                 </li>
                 <li>
                   <strong>Token: </strong>
-                  <Address address={fundData.token} />
+                  <Address address={fundData.payoutToken} />
                   {(tokenData === undefined) ? (
                     <span>Loading...</span>
                   ) : (
@@ -592,7 +416,7 @@ export default function FundPage({
                       </li>
                       <li>
                         <strong>Supply: </strong>
-                        {formatNumber(formatUnits(tokenData.supply, Number(tokenData.decimals)))} {tokenData.symbol}
+                        {formatNumber(formatUnits(fundTokenSupply, Number(tokenData.decimals)))} {tokenData.symbol}
                       </li>
                     </ul>
                   )}
@@ -619,7 +443,10 @@ export default function FundPage({
                   {!termsData?.text ? (
                     <p className="italic">Extended IPFS Data Unavailable</p>
                   ) : (
-                    <p className="whitespace-pre-line">{termsData.text}</p>
+                    <>
+                      <h4>{termsData.title || "Untitled"}</h4>
+                      <p className="whitespace-pre-line">{termsData.text}</p>
+                    </>
                   )}
                 </>
               )}
@@ -641,7 +468,7 @@ export default function FundPage({
                     className="border-black border-1 px-2 py-1"
                     pattern="^0x[a-fA-F0-9]{130}$"
                     value={oracleSign}
-                    onChange={onSignChange}
+                    onChange={(e) => setOracleSign(e.target.value)}
                     placeholder={`0x${'0'.repeat(130)}`}
                   />
                   <button onClick={lockIn} disabled={!oracleSign}>
@@ -657,7 +484,7 @@ export default function FundPage({
                     type="number"
                     step="0.0001"
                     value={funderDepo}
-                    onChange={onDepoChange}
+                    onChange={(e) => setFunderDepo(e.target.value)}
                     placeholder="10"
                   />
                   <button onClick={deposit}>
@@ -677,7 +504,7 @@ export default function FundPage({
                     type="number"
                     step="0.0001"
                     value={workerWith}
-                    onChange={onWithChange}
+                    onChange={(e) => setWorkerWith(e.target.value)}
                     placeholder="10"
                   />
                   {(walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) && (
@@ -692,7 +519,7 @@ export default function FundPage({
                         className="border-black border-1 px-2 py-1"
                         pattern="^0x[a-fA-F0-9]{130}$"
                         value={oracleSign}
-                        onChange={onSignChange}
+                        onChange={(e) => setOracleSign(e.target.value)}
                         placeholder={`0x${'0'.repeat(130)}`}
                       />
                       <button onClick={execWithdrawal}>
