@@ -5,6 +5,8 @@ import { useAppKitAccount } from "@reown/appkit/react";
 import { ConnectButton } from "@/comp/ConnectButton";
 import { FundCard } from "@/comp/FundCard";
 import { Card } from "@/comp/Card";
+import { parseStatus } from "@/lib/util";
+import { FundStatus } from "@/type";
 import Contracts from '@/../chain/contracts';
 
 interface Fund {
@@ -12,8 +14,8 @@ interface Fund {
   worker: `0x${string}`;
   oracle: `0x${string}`;
   token: `0x${string}`;
+  status: FundStatus;
   fundsAvailable: string;
-  isLocked: boolean;
   tokenSymbol: string;
 }
 
@@ -23,7 +25,7 @@ export default function BrowseFunds() {
   const [funds, setFunds] = useState<Fund[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'locked' | 'unlocked'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | FundStatus>('all');
 
   const ChainContracts = useMemo(() => {
     if (!isConnected || !caipAddress) return undefined;
@@ -39,7 +41,7 @@ export default function BrowseFunds() {
 
   const loadAllFunds = async () => {
     if (!ChainContracts || !caipAddress) return;
-    
+
     setIsLoading(true);
     try {
       // Import required functions
@@ -69,7 +71,7 @@ export default function BrowseFunds() {
       const fundDetails = await Promise.all(
         allFunds.map(async (fundAddress) => {
           try {
-            const [worker, oracle, token, termsSignature, fundsAvailable] = await Promise.all([
+            const [worker, oracle, token, status, fundsAvailable] = await Promise.all([
               readContract(APPKIT_WAGMI.wagmiConfig, {
                 address: fundAddress,
                 abi: ChainContracts.Fund.abi,
@@ -91,9 +93,9 @@ export default function BrowseFunds() {
               readContract(APPKIT_WAGMI.wagmiConfig, {
                 address: fundAddress,
                 abi: ChainContracts.Fund.abi,
-                functionName: 'termsSignature',
+                functionName: 'status',
                 args: [],
-              }) as Promise<string>,
+              }) as Promise<bigint>,
               readContract(APPKIT_WAGMI.wagmiConfig, {
                 address: fundAddress,
                 abi: ChainContracts.Fund.abi,
@@ -102,15 +104,13 @@ export default function BrowseFunds() {
               }) as Promise<bigint>,
             ]);
 
-            const isLocked = termsSignature && termsSignature !== '0x';
-
             return {
               address: fundAddress,
               worker,
               oracle,
               token,
               fundsAvailable: formatUnits(fundsAvailable, 18),
-              isLocked,
+              status: parseStatus(status),
               tokenSymbol: 'FTK', // Default symbol, could be fetched from token contract
             };
           } catch (error) {
@@ -122,7 +122,7 @@ export default function BrowseFunds() {
 
       const validFunds = fundDetails.filter((fund): fund is Fund => fund !== null);
       setFunds(validFunds);
-      
+
       console.log('Browse funds loaded:', validFunds);
     } catch (error) {
       console.error('Error loading funds:', error);
@@ -132,15 +132,14 @@ export default function BrowseFunds() {
   };
 
   const filteredFunds = funds.filter((fund) => {
-    const matchesSearch = 
+    const matchesSearch =
       fund.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
       fund.worker.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesFilter = 
-      filterStatus === 'all' || 
-      (filterStatus === 'locked' && fund.isLocked) ||
-      (filterStatus === 'unlocked' && !fund.isLocked);
-    
+
+    const matchesFilter =
+      filterStatus === 'all' ||
+      (filterStatus === fund.status);
+
     return matchesSearch && matchesFilter;
   });
 
@@ -178,16 +177,22 @@ export default function BrowseFunds() {
             All
           </button>
           <button
-            onClick={() => setFilterStatus('locked')}
-            className={filterStatus === 'locked' ? 'bg-black text-white' : ''}
+            onClick={() => setFilterStatus('pending')}
+            className={filterStatus === 'pending' ? 'bg-black text-white' : ''}
+          >
+            Pending
+          </button>
+          <button
+            onClick={() => setFilterStatus('active')}
+            className={filterStatus === 'active' ? 'bg-black text-white' : ''}
           >
             Active
           </button>
           <button
-            onClick={() => setFilterStatus('unlocked')}
-            className={filterStatus === 'unlocked' ? 'bg-black text-white' : ''}
+            onClick={() => setFilterStatus('closed')}
+            className={filterStatus === 'closed' ? 'bg-black text-white' : ''}
           >
-            Pending
+            Closed
           </button>
         </div>
       </div>
@@ -200,12 +205,12 @@ export default function BrowseFunds() {
           <Card>
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">
-                {searchQuery || filterStatus !== 'all' 
-                  ? 'No funds match your search criteria' 
+                {searchQuery || filterStatus !== 'all'
+                  ? 'No funds match your search criteria'
                   : 'No funds available yet'}
               </p>
               {(searchQuery || filterStatus !== 'all') && (
-                <button 
+                <button
                   onClick={() => {
                     setSearchQuery('');
                     setFilterStatus('all');
@@ -220,30 +225,11 @@ export default function BrowseFunds() {
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredFunds.map((fund) => (
-              <FundCard
-                key={fund.address}
-                address={fund.address}
-                worker={fund.worker}
-                oracle={fund.oracle}
-                fundsAvailable={fund.fundsAvailable}
-                isLocked={fund.isLocked}
-                tokenSymbol={fund.tokenSymbol}
-              />
+              <FundCard key={fund.address} {...fund} />
             ))}
           </div>
         )}
       </div>
-
-      {/* Info Section */}
-      <Card className="bg-blue-50 border-blue-200">
-        <h3 className="mb-3">💡 How to Fund a Campaign</h3>
-        <ol className="space-y-2 text-gray-700">
-          <li><strong>1.</strong> Click on a fund card to view details</li>
-          <li><strong>2.</strong> Ensure the fund is locked (approved by oracle)</li>
-          <li><strong>3.</strong> Review the project terms and milestones</li>
-          <li><strong>4.</strong> Deposit your tokens to support the project</li>
-        </ol>
-      </Card>
     </div>
   );
 }

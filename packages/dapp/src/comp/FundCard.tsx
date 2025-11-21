@@ -9,16 +9,16 @@ interface FundCardProps {
   worker: `0x${string}`;
   oracle: `0x${string}`;
   fundsAvailable: string;
-  isLocked: boolean;
+  status: FundStatus;
   tokenSymbol?: string;
 }
 
-export function FundCard({ 
-  address, 
-  worker, 
-  oracle, 
-  fundsAvailable, 
-  isLocked,
+export function FundCard({
+  address,
+  worker,
+  oracle,
+  fundsAvailable,
+  status,
   tokenSymbol = 'USDC'
 }: FundCardProps) {
   const router = useRouter();
@@ -31,9 +31,9 @@ export function FundCard({
             <h4 className="text-sm text-gray-500">Fund Address</h4>
             <Address address={address} />
           </div>
-          <StatusBadge status={isLocked ? 'locked' : 'unlocked'} />
+          <StatusBadge status={status} />
         </div>
-        
+
         <div className="grid grid-cols-2 gap-4">
           <div>
             <h4 className="text-sm text-gray-500">Worker</h4>
@@ -44,7 +44,7 @@ export function FundCard({
             <Address address={oracle} />
           </div>
         </div>
-        
+
         <div className="pt-2 border-t border-gray-200">
           <h4 className="text-sm text-gray-500">Available Funds</h4>
           <p className="text-xl font-bold">{fundsAvailable} {tokenSymbol}</p>

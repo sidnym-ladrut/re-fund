@@ -5,6 +5,7 @@ import {IFund} from "./IFund.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {Clones} from "@openzeppelin/contracts/proxy/Clones.sol";
@@ -14,7 +15,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 /// @title Fund
 /// @notice A treasury contract that manages payouts to a worker (the owner) with the approval of an oracle (the assessor) with ERC20 donations from funders (any donor)
 /// @author ~sidnym-ladrut -- DM on Urbit for more details
-contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
+contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable, ReentrancyGuardUpgradeable {
   ///////////////
   // Constants //
   ///////////////
@@ -44,7 +45,9 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @notice The terms of the work for this fund (generally stored as the IPFS CID of the JSON file)
   string public terms;
   /// @notice The nonce for the next withdrawal
-  uint8 public nonce;
+  uint256 public nonce;
+  /// @notice The flag for if a fund has been terminated
+  bool public closed;
   /// @notice The total amount of value withdrawn from this fund
   uint256 private _withdrawn;
 
@@ -83,6 +86,12 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
     _;
   }
 
+  /// @notice Constrains the call time to before {close} is called
+  modifier beforeClosed() {
+    require(!closed, "Fund has already been closed");
+    _;
+  }
+
   ///////////////
   // Functions //
   ///////////////
@@ -92,6 +101,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   constructor() initializer {
     __Ownable_init(msg.sender);
     __EIP712_init("Fund", "1");
+    __ReentrancyGuard_init();
     oracle = msg.sender;
   }
 
@@ -145,8 +155,8 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @param deadline The last permitted block time for the signed deposit (as a Unix epoch value)
   /// @param funderSignature An ERC20Permit signature from {funder} authorizing {amount} of {token} to be transferred
   function deposit(ERC20Permit token, address funder, uint256 amount, uint256 deadline, bytes memory funderSignature)
-      public afterLocked {
-    // TODO: Remove
+      public afterLocked beforeClosed nonReentrant {
+    // TODO: Remove when multiple token types are supported
     require(token == payoutToken, "Only deposits in the contract's payout token are currently accepted");
 
     bytes32 r;
@@ -181,7 +191,7 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   /// @param amount The amount of {payoutToken} that will be withdrawn
   /// @param oracleSignature An EIP-712 signature from the {oracle} authorizing an {amount} transfer to {worker}
   function withdraw(uint256 amount, bytes memory oracleSignature)
-      public onlyOwner afterLocked {
+      public onlyOwner afterLocked nonReentrant {
     require(amount > 0, "Must withdraw a non-zero sum");
     require(amount <= funds(), "Overdraft on the existing funds");
 
@@ -201,17 +211,15 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
   }
 
   /// @notice Refunds all unclaimed tokens in this fund to their respective funders
-  /// @dev Refunds are proportional to (1) the funder's funding amount and (2) the remaining funds in this contract
-  function refund() public onlyManager afterLocked {
-    // TODO: Close out the fund (set a flag using an existing variable)
-    // TODO: Any per-token remainder should be sent to the oracle
+  /// @dev Refunds are proportional to (1) the funder's funding amount since fund activation or prior refund and (2) the remaining funds in this contract
+  function refund() public onlyManager afterLocked nonReentrant {
     uint256 fundsRegistered_ = fundsRegistered();
     uint256 fundsRemaining = (fundsRegistered_ - _withdrawn);
     require(fundsRemaining > 0, "Must refund a non-zero sum");
 
-    uint256 fundsRefunded = 0;
     for (uint256 i = 0; i < treasuryTokens.length; i++) {
       ERC20Permit token = treasuryTokens[i];
+      uint256 tokensRefunded = 0;
       for (uint256 j = 0; j < treasuryFunders.length; j++) {
         address funder = treasuryFunders[j];
 
@@ -219,12 +227,26 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
         if (funderTokenSum > 0) {
           uint256 funderTokenRefund = (funderTokenSum * fundsRemaining) / fundsRegistered_;
           token.transfer(funder, funderTokenRefund);
-          fundsRefunded += funderTokenRefund;
+          tokensRefunded += funderTokenRefund;
         }
+        _treasury[token][funder] = 0;
+      }
+
+      uint256 tokensLeftover = token.balanceOf(address(this));
+      if (tokensLeftover > 0) {
+        token.transfer(oracle, tokensLeftover);
       }
     }
 
-    emit Refund(msg.sender, fundsRefunded);
+    // NOTE: Reset proportional deposits on refund
+    _withdrawn = 0;
+
+    emit Refund(msg.sender, fundsRemaining);
+  }
+
+  /// @notice Closes a fund to any more donations (e.g. when work is complete)
+  function close() public onlyManager afterLocked beforeClosed {
+    closed = true;
   }
 
   /// @notice Alias for {fundsAvailable}
@@ -252,6 +274,16 @@ contract Fund is IFund, Initializable, OwnableUpgradeable, EIP712Upgradeable {
       }
     }
     return amount;
+  }
+
+  /// @notice Returns the active {Status} for a fund
+  /// @return stat The current status of a fund: pending (created & not locked), active (locked & not closed), or closed (done)
+  function status() public view returns (Status stat) {
+    return closed
+      ? Status.Closed
+      : (termsSignature.length == 0)
+        ? Status.Pending
+        : Status.Active;
   }
 
   //////////////////////

@@ -61,7 +61,7 @@ export default function FundTracker() {
                   <div className="text-right"># Funders</div>
                   <div className="text-right">Status</div>
                 </div>
-                
+
                 {/* Fund Rows */}
                 <div>
                   {allFunds.map((fundAddress, idx) => (
@@ -97,13 +97,13 @@ export default function FundTracker() {
 }
 
 // Fund list item with full details
-function FundListItem({ 
-  address, 
-  isSelected, 
+function FundListItem({
+  address,
+  isSelected,
   onClick,
   isEven
-}: { 
-  address: AddressType; 
+}: {
+  address: AddressType;
   isSelected: boolean;
   onClick: () => void;
   isEven: boolean;
@@ -132,7 +132,7 @@ function FundListItem({
   const totalWithdrawn = withdrawals.reduce((sum, w) => sum + w.amount, BigInt(0));
   const totalRefunded = refunds.reduce((sum, r) => sum + r.amount, BigInt(0));
   const remaining = totalDeposited - totalWithdrawn - totalRefunded;
-  
+
   const uniqueFunders = new Set(deposits.map(d => d.funder)).size;
 
   // Compute background color class
@@ -164,13 +164,7 @@ function FundListItem({
         {uniqueFunders}
       </div>
       <div className="col-span-2 sm:col-span-1 flex items-center justify-start sm:justify-end">
-        <span className={`inline-block px-2 py-0.5 text-xs font-medium rounded-full ${
-          fundData.locked 
-            ? 'bg-purple-100 text-purple-800' 
-            : 'bg-yellow-100 text-yellow-800'
-        }`}>
-          {fundData.locked ? 'Locked' : 'Pending'}
-        </span>
+        <StatusBadge status={fundData.status} />
       </div>
     </button>
   );
@@ -181,7 +175,7 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
   const { data: fundData, isLoading: fundLoading } = useFundStaticData(fundAddress);
   const { data: tokenData, isLoading: tokenLoading } = useTokenData(fundData?.payoutToken || null);
   const { data: events, isLoading: eventsLoading } = useFundEvents(fundAddress);
-  
+
   // Watch for real-time updates
   useFundEventWatcher(fundAddress);
 
@@ -215,16 +209,16 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
             </div>
           </div>
           <div className="shrink-0">
-            <StatusBadge status={fundData.locked ? 'locked' : 'unlocked'} />
+            <StatusBadge status={fundData.status} />
           </div>
         </div>
-        
+
         <div className="space-y-3 text-sm">
           <div className="flex justify-between">
             <span className="font-semibold text-gray-700">Worker</span>
             <Address address={fundData.worker} className="text-sm" />
           </div>
-          
+
           <div className="flex justify-between">
             <span className="font-semibold text-gray-700">Oracle</span>
             <Address address={fundData.oracle} className="text-sm" />
@@ -234,7 +228,7 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
             <span className="font-semibold text-gray-700">Oracle Cut</span>
             <span className="font-medium">{(Number(fundData.oracleCut) / 100).toFixed(2)}%</span>
           </div>
-          
+
           <div className="flex justify-between">
             <span className="font-semibold text-gray-700">Payout Token</span>
             <span className="font-medium">{tokenData.symbol}</span>
@@ -243,7 +237,7 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
           {fundData.termsCID && fundData.termsCID !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
             <div className="flex justify-between items-start">
               <span className="font-semibold text-gray-700 whitespace-nowrap mr-4">Terms CID</span>
-              <a 
+              <a
                 href={`https://gateway.pinata.cloud/ipfs/${fundData.termsCID}`}
                 target="_blank"
                 rel="noopener noreferrer"

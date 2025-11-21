@@ -40,6 +40,11 @@ const CONTRACTS = {31337:{
         "type": "error"
       },
       {
+        "inputs": [],
+        "name": "ReentrancyGuardReentrantCall",
+        "type": "error"
+      },
+      {
         "anonymous": false,
         "inputs": [
           {
@@ -133,6 +138,26 @@ const CONTRACTS = {31337:{
         ],
         "name": "Withdrawal",
         "type": "event"
+      },
+      {
+        "inputs": [],
+        "name": "close",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "closed",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
       },
       {
         "inputs": [
@@ -312,9 +337,9 @@ const CONTRACTS = {31337:{
         "name": "nonce",
         "outputs": [
           {
-            "internalType": "uint8",
+            "internalType": "uint256",
             "name": "",
-            "type": "uint8"
+            "type": "uint256"
           }
         ],
         "stateMutability": "view",
@@ -384,6 +409,19 @@ const CONTRACTS = {31337:{
         "name": "renounceOwnership",
         "outputs": [],
         "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "status",
+        "outputs": [
+          {
+            "internalType": "enum IFund.Status",
+            "name": "stat",
+            "type": "uint8"
+          }
+        ],
+        "stateMutability": "view",
         "type": "function"
       },
       {

@@ -11,6 +11,8 @@ import { Modal } from "@/comp/Modal";
 import { StatusBadge } from "@/comp/StatusBadge";
 import { Address } from "@/comp/Address";
 import { formatNumber } from "@/lib/util";
+import { parseStatus } from "@/lib/util";
+import { FundStatus } from "@/type";
 import { APPKIT_WAGMI } from "@/cfg";
 import Contracts from '@/../chain/contracts';
 
@@ -20,7 +22,7 @@ interface Fund {
   oracle: `0x${string}`;
   token: `0x${string}`;
   fundsAvailable: bigint;
-  isLocked: boolean;
+  status: FundStatus;
 }
 
 export default function WorkerDashboard() {
@@ -49,7 +51,7 @@ export default function WorkerDashboard() {
     try {
       console.log('Worker Dashboard - Connected wallet address:', walletAddress);
       console.log('Worker Dashboard - CAIP address:', caipAddress);
-      
+
       // Filter funds where this wallet is the worker
       const workerFunds: `0x${string}`[] = await readContract(APPKIT_WAGMI.wagmiConfig, {
         address: ChainContracts.FundFactory.address,
@@ -63,7 +65,7 @@ export default function WorkerDashboard() {
       // Load details for each fund
       const fundDetails = await Promise.all(
         workerFunds.map(async (fundAddress) => {
-          const [worker, oracle, token, fundsAvailable, termsSignature] = await Promise.all([
+          const [worker, oracle, token, fundsAvailable, status] = await Promise.all([
             readContract(APPKIT_WAGMI.wagmiConfig, {
               address: fundAddress,
               abi: ChainContracts.Fund.abi,
@@ -91,7 +93,7 @@ export default function WorkerDashboard() {
             readContract(APPKIT_WAGMI.wagmiConfig, {
               address: fundAddress,
               abi: ChainContracts.Fund.abi,
-              functionName: 'termsSignature',
+              functionName: 'status',
               args: [],
             }),
           ]);
@@ -102,7 +104,7 @@ export default function WorkerDashboard() {
             oracle: oracle as `0x${string}`,
             token: token as `0x${string}`,
             fundsAvailable: fundsAvailable as bigint,
-            isLocked: termsSignature && (termsSignature as string) !== '0x',
+            status: parseStatus(status),
           };
         })
       );
@@ -148,7 +150,7 @@ export default function WorkerDashboard() {
         </Card>
         <Card>
           <h4 className="text-gray-500 mb-2">Active Campaigns</h4>
-          <p className="text-3xl font-bold">{funds.filter(f => f.isLocked).length}</p>
+          <p className="text-3xl font-bold">{funds.filter(f => (f.status === 'active')).length}</p>
         </Card>
         <Card>
           <h4 className="text-gray-500 mb-2">Total Raised</h4>
@@ -187,7 +189,7 @@ export default function WorkerDashboard() {
                       <h4 className="text-sm text-gray-500">Fund Address</h4>
                       <Address address={fund.address} />
                     </div>
-                    <StatusBadge status={fund.isLocked ? 'locked' : 'pending'} />
+                    <StatusBadge status={fund.status} />
                   </div>
                   <div>
                     <h4 className="text-sm text-gray-500">Oracle</h4>
@@ -199,13 +201,6 @@ export default function WorkerDashboard() {
                       {formatNumber(formatUnits(fund.fundsAvailable, 18))} tokens
                     </p>
                   </div>
-                  {fund.isLocked && (
-                    <div className="pt-2 border-t border-gray-200">
-                      <p className="text-sm text-gray-500 italic">
-                        Fund is locked - managed by oracle
-                      </p>
-                    </div>
-                  )}
                 </div>
               </Card>
             ))}
