@@ -14,7 +14,7 @@ export interface FundStaticData {
   oracle: Address;
   oracleCut: bigint;
   payoutToken: Address;
-  termsCID: string;
+  terms: string;
   status: FundStatus;
 }
 
@@ -127,7 +127,7 @@ export function useFundStaticData(fundAddress: Address | null) {
         oracle: oracle as Address,
         oracleCut: oracleCut as bigint,
         payoutToken: payoutToken as Address,
-        termsCID: terms as string,
+        terms: terms as string,
         status: parseStatus(status),
       } as FundStaticData;
     },

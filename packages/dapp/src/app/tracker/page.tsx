@@ -234,20 +234,20 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
             <span className="font-medium">{tokenData.symbol}</span>
           </div>
 
-          {fundData.termsCID && fundData.termsCID !== '0x0000000000000000000000000000000000000000000000000000000000000000' && (
+          {!!fundData.terms && (
             <div className="flex justify-between items-start">
               <span className="font-semibold text-gray-700 whitespace-nowrap mr-4">Terms CID</span>
               <a
-                href={`https://gateway.pinata.cloud/ipfs/${fundData.termsCID}`}
+                href={`https://gateway.pinata.cloud/ipfs/${fundData.terms}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:text-blue-800 underline text-right"
               >
                 <div className="font-mono text-sm break-all">
-                  {fundData.termsCID.slice(0, Math.ceil(fundData.termsCID.length / 2))}
+                  {fundData.terms.slice(0, Math.ceil(fundData.terms.length / 2))}
                 </div>
                 <div className="font-mono text-sm break-all">
-                  {fundData.termsCID.slice(Math.ceil(fundData.termsCID.length / 2))}
+                  {fundData.terms.slice(Math.ceil(fundData.terms.length / 2))}
                 </div>
               </a>
             </div>
