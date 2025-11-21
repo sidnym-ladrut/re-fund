@@ -4,7 +4,7 @@ export function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function trimAddress(address: `0x${string}`): `0x${string}` {
+export function trimAddress(address: string): string {
   return `${address.slice(0, 5)}…${address.slice(-4)}`;
 }
 
