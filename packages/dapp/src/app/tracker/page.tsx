@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react';
+import Link from 'next/link'
 import { useAppKitAccount } from "@reown/appkit/react";
 import { ConnectButton } from "@/comp/ConnectButton";
 import { Card } from "@/comp/Card";
@@ -199,15 +200,13 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
     <div className="space-y-6">
       {/* Fund Overview */}
       <Card>
-        <div className="mb-4 flex items-start justify-between">
-          <div className="flex-1 mr-4">
-            <div className="font-mono text-sm break-all">
-              {fundAddress.slice(0, 21)}
-            </div>
-            <div className="font-mono text-sm break-all">
-              {fundAddress.slice(21)}
-            </div>
-          </div>
+        <div className="mb-4 flex flex-row gap-x-4 items-start justify-between">
+          <Link
+            href={`/browser/${fundAddress}`}
+            className="flex-1 text-blue-600 hover:text-blue-800 underline font-mono text-sm break-all"
+          >
+            {fundAddress}
+          </Link>
           <div className="shrink-0">
             <StatusBadge status={fundData.status} />
           </div>
@@ -237,19 +236,14 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
           {!!fundData.terms && (
             <div className="flex justify-between items-start">
               <span className="font-semibold text-gray-700 whitespace-nowrap mr-4">Terms CID</span>
-              <a
+              <Link
                 href={`https://gateway.pinata.cloud/ipfs/${fundData.terms}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 hover:text-blue-800 underline text-right"
+                className="text-blue-600 hover:text-blue-800 underline text-right font-mono text-sm break-all"
               >
-                <div className="font-mono text-sm break-all">
-                  {fundData.terms.slice(0, Math.ceil(fundData.terms.length / 2))}
-                </div>
-                <div className="font-mono text-sm break-all">
-                  {fundData.terms.slice(Math.ceil(fundData.terms.length / 2))}
-                </div>
-              </a>
+                {fundData.terms}
+              </Link>
             </div>
           )}
         </div>

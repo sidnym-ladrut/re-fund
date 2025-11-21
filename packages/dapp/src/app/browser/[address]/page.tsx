@@ -492,7 +492,7 @@ export default function FundPage({
         console.log('IPFS Query:', {
           terms: fundData.terms,
           isValidCID,
-          hasPinata: !!PINATA
+          hasPinata: !!PINATA,
         });
 
         if (!isValidCID || !PINATA) {
@@ -517,6 +517,7 @@ export default function FundPage({
             if (jsonData.schema === "fund-plaintext" && jsonData.version === 0) {
               const dataUrl = await PINATA.gateways.public.convert(fundData.terms);
               setTermsData({
+                title: jsonData?.terms?.title ?? "",
                 text: jsonData?.terms?.text ?? "",
                 url: dataUrl,
               });
@@ -535,6 +536,7 @@ export default function FundPage({
               const termsText = `Title: ${title}\n\nSummary: ${summary}\n\nMilestones:\n${milestonesList}`;
 
               setTermsData({
+                title: title,
                 text: termsText,
                 url: dataUrl,
               });
