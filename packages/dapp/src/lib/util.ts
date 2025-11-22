@@ -1,4 +1,4 @@
-import { FundStatus } from "@/type";
+import { FundStatus, FundRole } from "@/type";
 
 export function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
@@ -14,6 +14,18 @@ export function formatNumber(x: string): string {
 
 export function isObject(v: any): boolean {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
+}
+
+export function encodeRole(s: FundRole): number {
+  if (s === 'worker') {
+    return 0;
+  } else if (s === 'oracle') {
+    return 1;
+  } else if (s === 'funder') {
+    return 2;
+  } else {
+    return 3;
+  }
 }
 
 export function parseStatus(s: number): FundStatus {

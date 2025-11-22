@@ -10,6 +10,7 @@ import type { Provider } from "@reown/appkit/react";
 import { useAppKitAccount } from "@reown/appkit/react";
 import { Address } from "@/comp/Address";
 import { StatusBadge } from '@/comp/StatusBadge';
+import { Card } from "@/comp/Card";
 import { formatNumber, nextPermitTime } from "@/lib/util";
 import { useChainContracts } from "@/hook/wallet";
 import { simulateContract, writeContract } from '@wagmi/core'
@@ -51,6 +52,12 @@ export default function FundPage({
   const chainId: number = useMemo(() => (
     Number(caipAddress?.split(':')?.[1] ?? 0)
   ), [caipAddress]);
+  const isWorker: boolean = useMemo(() => (
+    !!walletAddress && !!fundData && (walletAddress.toLowerCase() === fundData.worker.toLowerCase())
+  ), [walletAddress, fundData]);
+  const isOracle: boolean = useMemo(() => (
+    !!walletAddress && !!fundData && (walletAddress.toLowerCase() === fundData.oracle.toLowerCase())
+  ), [walletAddress, fundData]);
 
   const signOff = useCallback(() => {
     const signOffFun = async () => {
@@ -387,7 +394,7 @@ export default function FundPage({
     <span>Loading...</span>
   ) : (
     <div className="flex flex-col gap-y-4">
-      <div className="flex flex-row justify-between items-center gap-2">
+      <div className="flex flex-row justify-between items-center gap-2 pb-2 border-b border-gray-200">
         <h2>{termsData?.title ?? "Untitled Fund"}</h2>
         <StatusBadge status={fundData.status} />
       </div>
@@ -396,26 +403,26 @@ export default function FundPage({
           <span>Error! Unable to load fund.</span>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 justify-items-center gap-2">
-              <div className="col-span-1 flex flex-col items-center gap-1">
+            <div className="grid grid-cols-2 sm:grid-cols-4 justify-items-center gap-2 pb-3 border-b border-gray-200">
+              <div className="flex flex-col items-center gap-1">
                 <h3>Worker</h3>
                 <Address address={fundData.worker} />
               </div>
-              <div className="col-span-1 flex flex-col items-center gap-1">
+              <div className="flex flex-col items-center gap-1">
                 <h3>Oracle</h3>
                 <Address address={fundData.oracle} />
               </div>
-              <div className="col-span-1 flex flex-col items-center gap-1">
+              <div className="flex flex-col items-center gap-1">
                 <h3>Contract</h3>
                 <Address address={fundAddress} />
               </div>
-              <div className="col-span-1 flex flex-col items-center gap-1">
+              <div className="flex flex-col items-center gap-1">
                 <h3>Funds</h3>
                 {formatNumber(formatUnits(fundTokenSupply, Number(tokenData.decimals)))} {tokenData.symbol}
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-[3fr_1fr] gap-4">
-              <div className="col-span-1 flex flex-col gap-1">
+            <div className="grid grid-cols-1 md:grid-cols-[5fr_1fr] gap-4">
+              <div className="flex flex-col gap-1">
                 <h3>
                   <Link
                     className="underline"
@@ -428,101 +435,96 @@ export default function FundPage({
                 </h3>
                 <p className="whitespace-pre-line">{termsData.text}</p>
               </div>
-              <div className="col-span-1 flex flex-col gap-1">
+              <div className="flex flex-col gap-1">
                 <h3>Actions</h3>
-                {(walletAddress?.toLowerCase() === fundData.oracle.toLowerCase() && (fundData.status === 'pending')) && (
-                  <button onClick={signOff}>
-                    Sign Off
-                  </button>
-                )}
-                {(walletAddress?.toLowerCase() === fundData.worker.toLowerCase() && (fundData.status === 'pending')) && (
-                  <div className="border-black border-2 p-2 flex flex-col gap-y-2">
-                    <h3>Oracle Signature</h3>
-                    <p className="text-sm text-gray-600">
-                      Cryptographic signature from oracle approving the fund terms (132 chars)
-                    </p>
-                    <input
-                      className="border-black border-1 px-2 py-1"
-                      pattern="^0x[a-fA-F0-9]{130}$"
-                      value={oracleSign}
-                      onChange={(e) => setOracleSign(e.target.value)}
-                      placeholder={`0x${'0'.repeat(130)}`}
-                    />
-                    <button onClick={lockIn} disabled={!oracleSign}>
-                      Lock In
-                    </button>
-                  </div>
-                )}
-                {(isConnected && (fundData.status === 'active')) && (
-                  <div className="border-black border-2 p-2 flex flex-col gap-y-2">
-                    <h3>Deposit Amount</h3>
-                    <input
-                      className="border-black border-1 px-2 py-1"
-                      type="number"
-                      step="0.0001"
-                      value={funderDepo}
-                      onChange={(e) => setFunderDepo(e.target.value)}
-                      placeholder="10"
-                    />
-                    <button onClick={deposit}>
-                      Deposit
-                    </button>
-                  </div>
-                )}
-                {(
-                    (walletAddress?.toLowerCase() === fundData.worker.toLowerCase() ||
-                    walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) &&
-                    (fundData.status !== 'pending')
-                ) && (
-                  <div className="border-black border-2 p-2 flex flex-col gap-y-2">
-                    <h3>Withdrawal Amount</h3>
-                    <input
-                      className="border-black border-1 px-2 py-1"
-                      type="number"
-                      step="0.0001"
-                      value={workerWith}
-                      onChange={(e) => setWorkerWith(e.target.value)}
-                      placeholder="10"
-                    />
-                    {(walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) && (
-                      <button onClick={signWithdrawal}>
+                {(fundData.status === 'pending') && (
+                  <Card title="Lock In" className="flex flex-col gap-2">
+                    {isOracle && (
+                      <button onClick={signOff}>
                         Sign Off
                       </button>
                     )}
-                    {(walletAddress?.toLowerCase() === fundData.worker.toLowerCase()) && (
-                      <>
-                        <h3>Withdrawal Signature</h3>
+                    {isWorker && (
+                      <div className="flex gap-2">
                         <input
-                          className="border-black border-1 px-2 py-1"
+                          className="border-black border-1 px-2 py-1 max-w-[200px]"
                           pattern="^0x[a-fA-F0-9]{130}$"
                           value={oracleSign}
                           onChange={(e) => setOracleSign(e.target.value)}
-                          placeholder={`0x${'0'.repeat(130)}`}
+                          placeholder="Signature (0x...)"
+                        />
+                        <button onClick={lockIn} disabled={!oracleSign}>
+                          Lock&nbsp;In
+                        </button>
+                      </div>
+                    )}
+                  </Card>
+                )}
+                {(isConnected && (fundData.status === 'active')) && (
+                  <Card title="Deposit">
+                    <div className="flex gap-2">
+                      <input
+                        className="border-black border-1 px-2 py-1 max-w-[200px]"
+                        type="number"
+                        step="0.0001"
+                        value={funderDepo}
+                        onChange={(e) => setFunderDepo(e.target.value)}
+                        placeholder="Amount"
+                      />
+                      <button onClick={deposit}>
+                        Deposit
+                      </button>
+                    </div>
+                  </Card>
+                )}
+                {((isWorker || isOracle) && (fundData.status !== 'pending')) && (
+                  <Card title="Withdraw" className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <input
+                        className="border-black border-1 px-2 py-1 max-w-[200px]"
+                        type="number"
+                        step="0.0001"
+                        value={workerWith}
+                        onChange={(e) => setWorkerWith(e.target.value)}
+                        placeholder="Amount"
+                      />
+                      {isOracle && (
+                        <button onClick={signWithdrawal}>
+                          Sign Off
+                        </button>
+                      )}
+                    </div>
+                    {isWorker && (
+                      <div className="flex gap-2">
+                        <input
+                          className="border-black border-1 px-2 py-1 max-w-[200px]"
+                          pattern="^0x[a-fA-F0-9]{130}$"
+                          value={oracleSign}
+                          onChange={(e) => setOracleSign(e.target.value)}
+                          placeholder="Signature (0x...)"
                         />
                         <button onClick={execWithdrawal}>
                           Withdraw
                         </button>
-                      </>
+                      </div>
                     )}
-                  </div>
+                  </Card>
                 )}
-                {(
-                    (walletAddress?.toLowerCase() === fundData.worker.toLowerCase() ||
-                    walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) &&
-                    (fundData.status !== 'pending')
-                ) && (
-                  <button onClick={refund}>
-                    Refund
-                  </button>
-                )}
-                {(
-                    (walletAddress?.toLowerCase() === fundData.worker.toLowerCase() ||
-                    walletAddress?.toLowerCase() === fundData.oracle.toLowerCase()) &&
-                    (fundData.status === 'active')
-                ) && (
-                  <button onClick={closeFund}>
-                    Close
-                  </button>
+                {((isWorker || isOracle) && (fundData.status !== 'pending')) && (
+                  <Card title="Finalize">
+                    <div className="flex justify-around">
+                      {(fundData.status !== 'pending') && (
+                        <button onClick={refund}>
+                          Refund
+                        </button>
+                      )}
+                      {(fundData.status === 'active') && (
+                        <button onClick={closeFund}>
+                          Close
+                        </button>
+                      )}
+                    </div>
+                  </Card>
                 )}
               </div>
             </div>

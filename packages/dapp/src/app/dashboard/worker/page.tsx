@@ -7,127 +7,29 @@ import { readContract, writeContract, waitForTransactionReceipt, simulateContrac
 import { formatUnits, encodeAbiParameters, parseAbiParameters, keccak256, toHex } from 'viem';
 import { ConnectButton } from "@/comp/ConnectButton";
 import { Card } from "@/comp/Card";
+import { FundCard3 } from "@/comp/FundCard";
 import { Modal } from "@/comp/Modal";
 import { StatusBadge } from "@/comp/StatusBadge";
 import { Address } from "@/comp/Address";
 import { formatNumber } from "@/lib/util";
 import { parseStatus } from "@/lib/util";
 import { FundStatus } from "@/type";
+import { useRoleFunds, useRoleFundsFull } from "@/hook/useFundData";
+import { useChainContracts } from "@/hook/wallet";
 import { APPKIT_WAGMI } from "@/cfg";
 import Contracts from '@/../chain/contracts';
 
-interface Fund {
-  address: `0x${string}`;
-  worker: `0x${string}`;
-  oracle: `0x${string}`;
-  token: `0x${string}`;
-  fundsAvailable: bigint;
-  status: FundStatus;
-}
-
 export default function WorkerDashboard() {
-  const router = useRouter();
   const { address: walletAddress, isConnected, caipAddress } = useAppKitAccount();
-  const [funds, setFunds] = useState<Fund[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const { data: funds, isPending: isFundsPending, isLoading: isFundsLoading } = useRoleFundsFull(walletAddress, 'worker');
 
-  const ChainContracts = useMemo(() => {
-    if (!isConnected || !caipAddress) return undefined;
-    const chainId = caipAddress.split(':')?.[1];
-    return chainId ? Contracts[chainId as keyof typeof Contracts] : undefined;
-  }, [isConnected, caipAddress]);
-
-  useEffect(() => {
-    if (isConnected && walletAddress && ChainContracts) {
-      loadWorkerFunds();
-    }
-  }, [isConnected, walletAddress, ChainContracts]);
-
-  const loadWorkerFunds = async () => {
-    if (!ChainContracts || !walletAddress) return;
-
-    setIsLoading(true);
-    try {
-      console.log('Worker Dashboard - Connected wallet address:', walletAddress);
-      console.log('Worker Dashboard - CAIP address:', caipAddress);
-
-      // Filter funds where this wallet is the worker
-      const workerFunds: `0x${string}`[] = await readContract(APPKIT_WAGMI.wagmiConfig, {
-        address: ChainContracts.FundFactory.address,
-        abi: ChainContracts.FundFactory.abi,
-        functionName: 'instances',
-        args: [walletAddress, 0],
-      }) as `0x${string}`[];
-
-      console.log('Found worker funds for', walletAddress, ':', workerFunds);
-
-      // Load details for each fund
-      const fundDetails = await Promise.all(
-        workerFunds.map(async (fundAddress) => {
-          const [worker, oracle, token, fundsAvailable, status] = await Promise.all([
-            readContract(APPKIT_WAGMI.wagmiConfig, {
-              address: fundAddress,
-              abi: ChainContracts.Fund.abi,
-              functionName: 'worker',
-              args: [],
-            }),
-            readContract(APPKIT_WAGMI.wagmiConfig, {
-              address: fundAddress,
-              abi: ChainContracts.Fund.abi,
-              functionName: 'oracle',
-              args: [],
-            }),
-            readContract(APPKIT_WAGMI.wagmiConfig, {
-              address: fundAddress,
-              abi: ChainContracts.Fund.abi,
-              functionName: 'payoutToken',
-              args: [],
-            }),
-            readContract(APPKIT_WAGMI.wagmiConfig, {
-              address: fundAddress,
-              abi: ChainContracts.Fund.abi,
-              functionName: 'fundsAvailable',
-              args: [],
-            }),
-            readContract(APPKIT_WAGMI.wagmiConfig, {
-              address: fundAddress,
-              abi: ChainContracts.Fund.abi,
-              functionName: 'status',
-              args: [],
-            }),
-          ]);
-
-          return {
-            address: fundAddress,
-            worker: worker as `0x${string}`,
-            oracle: oracle as `0x${string}`,
-            token: token as `0x${string}`,
-            fundsAvailable: fundsAvailable as bigint,
-            status: parseStatus(status),
-          };
-        })
-      );
-
-      setFunds(fundDetails);
-    } catch (error) {
-      console.error('Error loading funds:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (!isConnected) {
-    return (
-      <div className="text-center py-12">
-        <h1 className="mb-6">Worker Dashboard</h1>
-        <p className="text-gray-600 mb-6">Connect your wallet to view and manage your funds</p>
-        <ConnectButton />
-      </div>
-    );
-  }
-
-  return (
+  return (!isConnected) ? (
+    <div className="text-center py-12">
+      <h1 className="mb-6">Worker Dashboard</h1>
+      <p className="text-gray-600 mb-6">Connect your wallet to view and manage your funds</p>
+    </div>
+  ) : (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
@@ -142,73 +44,48 @@ export default function WorkerDashboard() {
         </button>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card>
-          <h4 className="text-gray-500 mb-2">Total Funds</h4>
-          <p className="text-3xl font-bold">{funds.length}</p>
-        </Card>
-        <Card>
-          <h4 className="text-gray-500 mb-2">Active Campaigns</h4>
-          <p className="text-3xl font-bold">{funds.filter(f => (f.status === 'active')).length}</p>
-        </Card>
-        <Card>
-          <h4 className="text-gray-500 mb-2">Total Raised</h4>
-          <p className="text-3xl font-bold">$0.00</p>
-        </Card>
-      </div>
-
-      {/* Funds List */}
-      <div>
-        <h2 className="mb-4">Your Funds</h2>
-        {isLoading ? (
-          <div className="text-center py-12 text-gray-500">Loading your funds...</div>
-        ) : funds.length === 0 ? (
-          <Card>
-            <div className="text-center py-12">
-              <p className="text-gray-500 mb-4">You haven't created any funds yet</p>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="link-button"
-              >
-                Create Your First Fund
-              </button>
-            </div>
-          </Card>
-        ) : (
-          <div className="grid md:grid-cols-2 gap-6">
-            {funds.map((fund) => (
-              <Card
-                key={fund.address}
-                onClick={() => router.push(`/browser/${fund.address}`)}
-                className="hover:border-black cursor-pointer"
-              >
-                <div className="space-y-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="text-sm text-gray-500">Fund Address</h4>
-                      <Address address={fund.address} />
-                    </div>
-                    <StatusBadge status={fund.status} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm text-gray-500">Oracle</h4>
-                    <Address address={fund.oracle} />
-                  </div>
-                  <div className="pt-2 border-t border-gray-200">
-                    <h4 className="text-sm text-gray-500">Available Funds</h4>
-                    <p className="text-xl font-bold">
-                      {formatNumber(formatUnits(fund.fundsAvailable, 18))} tokens
-                    </p>
-                  </div>
+      {(isFundsPending || isFundsLoading) ? (
+        <div className="text-center py-12 text-gray-500">Loading funds...</div>
+      ) : (
+        <>
+          <div className="grid md:grid-cols-3 gap-6">
+            <Card>
+              <h4 className="text-gray-500 mb-2">Total Funds</h4>
+              <p className="text-3xl font-bold">{funds.length}</p>
+            </Card>
+            <Card>
+              <h4 className="text-gray-500 mb-2">Active Campaigns</h4>
+              <p className="text-3xl font-bold">{funds.filter(f => (f.status === 'active')).length}</p>
+            </Card>
+            <Card>
+              <h4 className="text-gray-500 mb-2">Total Raised</h4>
+              <p className="text-3xl font-bold">$0.00</p>
+            </Card>
+          </div>
+          <div>
+            <h2 className="mb-4">Your Funds</h2>
+            {(funds.length === 0) ? (
+              <Card>
+                <div className="text-center py-12">
+                  <p className="text-gray-500 mb-4">You haven't created any funds yet</p>
+                  <button
+                    onClick={() => setShowCreateModal(true)}
+                    className="link-button"
+                  >
+                    Create Your First Fund
+                  </button>
                 </div>
               </Card>
-            ))}
+            ) : (
+              <div className="grid md:grid-cols-2 gap-6">
+                {funds.map((fund) => (
+                  <FundCard3 key={fund.address} {...fund} />
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-
-      {/* Create Fund Modal */}
+        </>
+      )}
       <Modal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
@@ -217,7 +94,6 @@ export default function WorkerDashboard() {
       >
         <CreateFundForm onSuccess={() => {
           setShowCreateModal(false);
-          loadWorkerFunds();
         }} />
       </Modal>
     </div>
@@ -237,13 +113,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-
-  // Use the new hook from teammate's code
-  const ChainContracts = useMemo(() => {
-    if (!isConnected || !caipAddress) return undefined;
-    const chainId = caipAddress.split(':')?.[1];
-    return chainId ? Contracts[chainId as unknown as keyof typeof Contracts] : undefined;
-  }, [isConnected, caipAddress]);
+  const chainContracts = useChainContracts();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,7 +121,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
     setIsSubmitting(true);
 
     try {
-      if (!ChainContracts || !walletAddress || !walletProvider) {
+      if (!chainContracts || !walletAddress || !walletProvider) {
         throw new Error('Wallet not connected');
       }
 
@@ -314,8 +184,8 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
       // Use teammate's improved approach with simulation + salt
       const salt = keccak256(toHex(Date.now()));
       const { result, request } = await simulateContract(APPKIT_WAGMI.wagmiConfig, {
-        address: ChainContracts.FundFactory.address,
-        abi: ChainContracts.FundFactory.abi,
+        address: chainContracts.FundFactory.address,
+        abi: chainContracts.FundFactory.abi,
         functionName: 'deploy',
         args: [fundArgs],
       });
@@ -406,10 +276,10 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
             required
             disabled={isSubmitting}
           />
-          {ChainContracts?.FundToken && (
+          {chainContracts?.FundToken && (
             <button
               type="button"
-              onClick={() => setFormData({ ...formData, token: ChainContracts.FundToken.address })}
+              onClick={() => setFormData({ ...formData, token: chainContracts.FundToken.address })}
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 whitespace-nowrap text-sm"
               disabled={isSubmitting}
             >
@@ -419,8 +289,8 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
         <p className="text-sm text-gray-500 mt-1">
           ERC20 token address for payouts (must support ERC20Permit)
-          {ChainContracts?.FundToken && (
-            <span className="block mt-0.5">FundToken: {ChainContracts.FundToken.address}</span>
+          {chainContracts?.FundToken && (
+            <span className="block mt-0.5">FundToken: {chainContracts.FundToken.address}</span>
           )}
         </p>
       </div>
