@@ -42,9 +42,11 @@ export default function FundPage({
   const { data: tokenData , isLoading: isTokenLoading, isPending: isTokenPending } = useTokenData(fundData?.payoutToken);
 
   const [fundTokenSupply, setFundTokenSupply] = useState<bigint>(0n);
-  const [oracleSign, setOracleSign] = useState<string>("");
+  const [termsSignature, setTermsSignature] = useState<string>(""); // For locking terms
+  const [withdrawalSignature, setWithdrawalSignature] = useState<string>(""); // For withdrawals
   const [funderDepo, setFunderDepo] = useState<string>("");
   const [workerWith, setWorkerWith] = useState<string>("");
+  const [requestedAmount, setRequestedAmount] = useState<string>(""); // Worker's withdrawal request
 
   const isLoading: boolean = useMemo(() => (
     [isFundLoading, isFundPending, isTermsLoading, isTermsPending, isTokenLoading, isTokenPending].some(v => v)
@@ -87,7 +89,7 @@ export default function FundPage({
 
         if (walletAddress.toLowerCase() === fundData.worker.toLowerCase()) {
           // Auto-fill the signature input field
-          setOracleSign(signature);
+          setTermsSignature(signature);
           alert("Signature generated and filled! You can now click 'Lock In' to activate the fund.");
         } else {
           alert(`Signature saved! The worker can now lock the fund.\n\nSignature: ${signature}`);
@@ -102,18 +104,19 @@ export default function FundPage({
         address: fundAddress,
         abi: chainContracts.Fund.abi,
         functionName: 'lockTerms',
-        args: [oracleSign],
+        args: [termsSignature],
       });
       const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
 
       // Clear the saved signature after successful lock
       const storageKey = `fund-signature-${fundAddress.toLowerCase()}`;
       localStorage.removeItem(storageKey);
+      setTermsSignature(''); // Clear signature from state
 
       window.location.reload(); // FIXME: Super clumsy cache invalidation
     };
     lockInFun();
-  }, [oracleSign, chainContracts, fundAddress]);
+  }, [termsSignature, chainContracts, fundAddress]);
   const deposit = useCallback(() => {
     const depositFun = async () => {
       if (isFundLoading || isTokenLoading || !chainContracts || !fundData || !tokenData || !walletAddress) {
@@ -176,6 +179,34 @@ export default function FundPage({
     };
     depositFun();
   }, [walletAddress, chainId, isFundLoading, isTokenLoading, funderDepo, fundData, tokenData, chainContracts, signData, fundAddress]);
+  const requestWithdrawal = useCallback(async () => {
+    if (!chainContracts || !fundData) {
+      alert('Fund data not loaded');
+      return;
+    }
+
+    if (!workerWith || parseFloat(workerWith) <= 0) {
+      alert('Please enter a valid withdrawal amount');
+      return;
+    }
+
+    try {
+      const nonce = await readContract(APPKIT_WAGMI.wagmiConfig, {
+        address: fundAddress,
+        abi: chainContracts.Fund.abi,
+        functionName: 'nonce',
+        args: [],
+      }) as bigint;
+
+      const requestKey = `fund-withdrawal-request-${fundAddress.toLowerCase()}-${nonce}`;
+      localStorage.setItem(requestKey, workerWith);
+      setRequestedAmount(workerWith);
+      alert(`Withdrawal request for ${workerWith} tokens saved! The oracle can now review and approve.`);
+    } catch (error: any) {
+      console.error('Request withdrawal error:', error);
+      alert(`Failed to save withdrawal request: ${error.message || 'Unknown error'}`);
+    }
+  }, [chainContracts, fundData, workerWith, fundAddress]);
   const signWithdrawal = useCallback(() => {
     const signWithdrawalFun = async () => {
       if (!chainContracts || isTokenLoading || !tokenData || !walletAddress) {
@@ -224,10 +255,15 @@ export default function FundPage({
         };
         localStorage.setItem(storageKey, JSON.stringify(withdrawalData));
 
+        // Clear the withdrawal request after oracle signs
+        const requestKey = `fund-withdrawal-request-${fundAddress.toLowerCase()}-${nonce}`;
+        localStorage.removeItem(requestKey);
+        setRequestedAmount(''); // Clear from state
+
         // Auto-fill the withdrawal signature field
         if (walletAddress.toLowerCase() === fundData?.worker?.toLowerCase()) {
           // Auto-fill the signature input field
-          setOracleSign(signature);
+          setWithdrawalSignature(signature);
           alert("Withdrawal signature generated and filled! You can now execute the withdrawal.");
         } else {
           alert(`Withdrawal signature saved! The worker can now execute the withdrawal for ${workerWith} tokens.\n\nSignature: ${signature}`);
@@ -241,7 +277,7 @@ export default function FundPage({
   }, [walletAddress, chainId, isTokenLoading, workerWith, fundData, tokenData, chainContracts, fundAddress, signData]);
   const execWithdrawal = useCallback(() => {
     const execWithdrawalFun = async () => {
-      if (!chainContracts || isTokenLoading || !tokenData || !oracleSign) {
+      if (!chainContracts || isTokenLoading || !tokenData || !withdrawalSignature) {
         alert('Please ensure oracle has signed the withdrawal');
         return;
       }
@@ -266,7 +302,7 @@ export default function FundPage({
           address: fundAddress,
           abi: chainContracts.Fund.abi,
           functionName: 'withdraw',
-          args: [withAmount, oracleSign as `0x${string}`],
+          args: [withAmount, withdrawalSignature as `0x${string}`],
         });
 
         const hash = await writeContract(APPKIT_WAGMI.wagmiConfig, request);
@@ -277,7 +313,7 @@ export default function FundPage({
 
         alert(`Withdrawal successful! Transaction: ${hash}`);
         setWorkerWith(''); // Clear input
-        setOracleSign(''); // Clear signature
+        setWithdrawalSignature(''); // Clear signature
         window.location.reload(); // FIXME: Super clumsy cache invalidation
       } catch (error: any) {
         console.error('Withdrawal error:', error);
@@ -285,7 +321,7 @@ export default function FundPage({
       }
     };
     execWithdrawalFun();
-  }, [chainContracts, tokenData, isTokenLoading, workerWith, oracleSign, fundAddress]);
+  }, [chainContracts, tokenData, isTokenLoading, workerWith, withdrawalSignature, fundAddress]);
   const refund = useCallback(() => {
     const refundFun = async () => {
       if (!chainContracts) {
@@ -345,9 +381,34 @@ export default function FundPage({
     closeFundFun();
   }, [chainContracts, fundAddress]);
 
+  // Load terms signature for worker
   useEffect(() => {
+    // Always clear first to prevent cross-fund contamination
+    setTermsSignature('');
+
+    if (!!chainContracts && !isFundLoading && !!fundData && fundData.status === 'pending' && walletAddress?.toLowerCase() === fundData.worker.toLowerCase()) {
+      const storageKey = `fund-signature-${fundAddress.toLowerCase()}`;
+      const savedSignature = localStorage.getItem(storageKey);
+      if (savedSignature) {
+        setTermsSignature(savedSignature);
+        console.log('Loaded saved terms signature from localStorage');
+      }
+    }
+  }, [chainContracts, fundAddress, fundData, isFundLoading, walletAddress]);
+
+  // Load withdrawal signature and amount for worker
+  useEffect(() => {
+    // Always clear first to prevent cross-fund contamination
+    setWithdrawalSignature('');
+
     const loadWithdrawalSignature = async () => {
-      if (!!chainContracts && !isFundLoading && !!fundData && (fundData.status !== 'pending') && walletAddress?.toLowerCase() === fundData.worker.toLowerCase()) {
+      // Only load if not worker for this fund
+      if (!isWorker || fundData?.status === 'pending') {
+        setWorkerWith('');
+        return;
+      }
+
+      if (!!chainContracts && !isFundLoading && !!fundData) {
         try {
           const nonce = await readContract(APPKIT_WAGMI.wagmiConfig, {
             address: fundAddress,
@@ -361,12 +422,12 @@ export default function FundPage({
           if (savedData) {
             try {
               const withdrawalData = JSON.parse(savedData);
-              setOracleSign(withdrawalData.signature);
+              setWithdrawalSignature(withdrawalData.signature);
               setWorkerWith(withdrawalData.amount);
               console.log('Loaded saved withdrawal signature and amount from localStorage');
             } catch (e) {
               // Old format (just signature string), handle gracefully
-              setOracleSign(savedData);
+              setWithdrawalSignature(savedData);
               console.log('Loaded saved withdrawal signature from localStorage (old format)');
             }
           }
@@ -376,7 +437,40 @@ export default function FundPage({
       }
     };
     loadWithdrawalSignature();
-  }, [chainContracts, fundAddress, fundData, isFundLoading, walletAddress]);
+  }, [chainContracts, fundAddress, fundData, isFundLoading, walletAddress, isWorker]);
+
+  // Load withdrawal request for oracle
+  useEffect(() => {
+    const loadWithdrawalRequest = async () => {
+      if (!isOracle || fundData?.status === 'pending') {
+        setRequestedAmount('');
+        return;
+      }
+
+      if (!!chainContracts && !isFundLoading && !!fundData) {
+        try {
+          const nonce = await readContract(APPKIT_WAGMI.wagmiConfig, {
+            address: fundAddress,
+            abi: chainContracts.Fund.abi,
+            functionName: 'nonce',
+            args: [],
+          }) as bigint;
+
+          const requestKey = `fund-withdrawal-request-${fundAddress.toLowerCase()}-${nonce}`;
+          const savedRequest = localStorage.getItem(requestKey);
+          if (savedRequest) {
+            setRequestedAmount(savedRequest);
+            setWorkerWith(savedRequest); // Pre-fill the amount field
+            console.log('Loaded worker withdrawal request from localStorage');
+          }
+        } catch (error) {
+          console.error('Error loading withdrawal request:', error);
+        }
+      }
+    };
+    loadWithdrawalRequest();
+  }, [chainContracts, fundAddress, fundData, isFundLoading, isOracle]);
+
   useEffect(() => {
     if (!!chainContracts && !isFundLoading && !!fundData) {
       readContract(APPKIT_WAGMI.wagmiConfig, {
@@ -449,11 +543,11 @@ export default function FundPage({
                         <input
                           className="border-black border-1 px-2 py-1 max-w-[200px]"
                           pattern="^0x[a-fA-F0-9]{130}$"
-                          value={oracleSign}
-                          onChange={(e) => setOracleSign(e.target.value)}
+                          value={termsSignature}
+                          onChange={(e) => setTermsSignature(e.target.value)}
                           placeholder="Signature (0x...)"
                         />
-                        <button onClick={lockIn} disabled={!oracleSign}>
+                        <button onClick={lockIn} disabled={!termsSignature}>
                           Lock&nbsp;In
                         </button>
                       </div>
@@ -477,8 +571,13 @@ export default function FundPage({
                     </div>
                   </Card>
                 )}
-                {((isWorker || isOracle) && (fundData.status !== 'pending')) && (
+                {((isWorker || isOracle) && (fundData.status !== 'pending') && fundTokenSupply > 0n) && (
                   <Card title="Withdraw" className="flex flex-col gap-2">
+                    {requestedAmount && isOracle && (
+                      <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-3 py-2 rounded">
+                        <p className="text-sm">Worker requested: {requestedAmount} tokens</p>
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <input
                         className="border-black border-1 px-2 py-1 max-w-[200px]"
@@ -494,13 +593,18 @@ export default function FundPage({
                         </button>
                       )}
                     </div>
+                    {isWorker && !withdrawalSignature && (
+                      <button onClick={requestWithdrawal}>
+                        Request Withdrawal
+                      </button>
+                    )}
                     {isWorker && (
                       <div className="flex gap-2">
                         <input
                           className="border-black border-1 px-2 py-1 max-w-[200px]"
                           pattern="^0x[a-fA-F0-9]{130}$"
-                          value={oracleSign}
-                          onChange={(e) => setOracleSign(e.target.value)}
+                          value={withdrawalSignature}
+                          onChange={(e) => setWithdrawalSignature(e.target.value)}
                           placeholder="Signature (0x...)"
                         />
                         <button onClick={execWithdrawal}>
@@ -510,10 +614,14 @@ export default function FundPage({
                     )}
                   </Card>
                 )}
-                {((isWorker || isOracle) && (fundData.status !== 'pending')) && (
+                {(
+                  (isWorker || isOracle) &&
+                  (fundData.status !== 'pending') &&
+                  ((fundTokenSupply > 0n) || (fundData.status === 'active'))
+                ) && (
                   <Card title="Finalize">
                     <div className="flex justify-around">
-                      {(fundData.status !== 'pending') && (
+                      {(fundTokenSupply > 0n) && (
                         <button onClick={refund}>
                           Refund
                         </button>
