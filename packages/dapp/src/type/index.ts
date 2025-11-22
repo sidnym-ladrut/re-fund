@@ -9,27 +9,33 @@ export type AddressType = 'account' | 'transaction' | 'signature';
 export type ChainAddress = `${string}:${Address}`;
 
 export type FundStatus = 'pending' | 'active' | 'closed';
+export type FundRole = 'worker' | 'oracle' | 'funder';
 
-// export interface WalletMeta {
-//   connected: boolean;
-//   address: Address;
-//   chain: bigint;
-//   contracts:
-// }
-
-export interface Contract {
-  address: Address;
-  abi: Abi;
+export interface TermsData {
+  cid: string;
+  text: string;
+  url?: string;
+  title?: string;
 }
-export interface Token extends Contract {
+
+export interface TokenData {
   name: string;
   symbol: string;
-  decimals: number;
-  deployer?: Address;
+  decimals: bigint;
 }
 
-export interface TokenHolding {
-  token: Token;
-  balance: bigint;
+export interface FundStaticData {
+  address: Address;
+  worker: Address;
+  oracle: Address;
+  oracleCut: bigint;
+  payoutToken: Address;
+  fundsAvailable: bigint;
+  terms: string;
+  status: FundStatus;
 }
-export type TokenHoldings = Record<string, TokenHolding>;
+
+export interface FundFullData extends FundStaticData {
+  termsData: TermsData;
+  tokenData: TokenData;
+}

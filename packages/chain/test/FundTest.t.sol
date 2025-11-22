@@ -13,7 +13,7 @@ contract FundTest is FundBaseTest {
   // Constants //
   ///////////////
 
-  string public constant FUND_TERMS = "bafkreigjokjc775uq75cv4n4wjsy4uofgwb3c7mi7epkpci2x6b26f3is4";
+  string public constant FUND_TERMS = "bafkreie7525ywkhwglluidqr3ule3jsd22bfyfs7yx6jgtlc3v34enosji";
   bytes32 public constant BAD_TERMS_HASH = bytes32(uint256(0));
   uint256 public constant ORACLE_CUT = 1e0 * 10 ** FUND_TOKEN_DECIMALS;
 
