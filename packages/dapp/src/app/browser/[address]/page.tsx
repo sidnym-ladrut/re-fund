@@ -385,7 +385,7 @@ export default function FundPage({
   useEffect(() => {
     // Always clear first to prevent cross-fund contamination
     setTermsSignature('');
-    
+
     if (!!chainContracts && !isFundLoading && !!fundData && fundData.status === 'pending' && walletAddress?.toLowerCase() === fundData.worker.toLowerCase()) {
       const storageKey = `fund-signature-${fundAddress.toLowerCase()}`;
       const savedSignature = localStorage.getItem(storageKey);
@@ -400,7 +400,7 @@ export default function FundPage({
   useEffect(() => {
     // Always clear first to prevent cross-fund contamination
     setWithdrawalSignature('');
-    
+
     const loadWithdrawalSignature = async () => {
       // Only load if not worker for this fund
       if (!isWorker || fundData?.status === 'pending') {
@@ -554,7 +554,7 @@ export default function FundPage({
                     )}
                   </Card>
                 )}
-                {(isConnected && !isWorker && !isOracle && (fundData.status === 'active')) && (
+                {(isConnected && (fundData.status === 'active')) && (
                   <Card title="Deposit">
                     <div className="flex gap-2">
                       <input
@@ -614,12 +614,18 @@ export default function FundPage({
                     )}
                   </Card>
                 )}
-                {((isWorker || isOracle) && (fundData.status !== 'pending') && fundTokenSupply > 0n) && (
+                {(
+                  (isWorker || isOracle) &&
+                  (fundData.status !== 'pending') &&
+                  ((fundTokenSupply > 0n) || (fundData.status === 'active'))
+                ) && (
                   <Card title="Finalize">
                     <div className="flex justify-around">
-                      <button onClick={refund}>
-                        Refund
-                      </button>
+                      {(fundTokenSupply > 0n) && (
+                        <button onClick={refund}>
+                          Refund
+                        </button>
+                      )}
                       {(fundData.status === 'active') && (
                         <button onClick={closeFund}>
                           Close
