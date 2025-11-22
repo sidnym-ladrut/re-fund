@@ -1,37 +1,38 @@
 'use client'
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppKitAccount } from "@reown/appkit/react";
 import { ConnectButton } from "@/comp/ConnectButton";
-import { FundCard2 } from "@/comp/FundCard";
+import { FundCard3 } from "@/comp/FundCard";
 import { Card } from "@/comp/Card";
 import { FundStatus } from "@/type";
-import { useAllFunds } from "@/hook/useFundData";
+import { useAllFundsFull } from "@/hook/useFundData";
 
 export default function BrowseFunds() {
   const router = useRouter();
   const { isConnected } = useAppKitAccount();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | FundStatus>('all');
+  const { data: funds, isPending: isFundsPending, isLoading: isFundsLoading } = useAllFundsFull();
 
-  const { data: allFundAddresses, isLoading, isPending } = useAllFunds();
+  const filteredFunds = useMemo(() => (
+    (funds || []).filter((fund) => {
+      if (!fund) return false;
+      const matchesSearch = !searchQuery || (
+        fund.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (fund?.termsData?.title || '').toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      const matchesFilter = (filterStatus === 'all') || (fund.status === filterStatus);
+      return matchesSearch && matchesFilter;
+    })
+  ), [funds, searchQuery, filterStatus]);
 
-  const filteredFunds = (allFundAddresses || []).filter((fundAddress) => {
-    if (!searchQuery) return true;
-    return fundAddress.toLowerCase().includes(searchQuery.toLowerCase());
-  });
-
-  if (!isConnected) {
-    return (
-      <div className="text-center py-12">
-        <h1 className="mb-6">Funder Dashboard</h1>
-        <p className="text-gray-600 mb-6">Connect your wallet to browse and fund campaigns</p>
-        <ConnectButton />
-      </div>
-    );
-  }
-
-  return (
+  return !isConnected ? (
+    <div className="text-center py-12">
+      <h1 className="mb-6">Funder Dashboard</h1>
+      <p className="text-gray-600 mb-6">Connect your wallet to browse and fund campaigns</p>
+    </div>
+  ) : (
     <div className="space-y-8">
       <div>
         <h1 className="mb-2">Funder Dashboard</h1>
@@ -44,31 +45,31 @@ export default function BrowseFunds() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by address or worker..."
+          placeholder="Search by address or title..."
           className="flex-1 px-4 py-3 border-2 border-gray-300 rounded-md focus:border-black outline-none"
         />
         <div className="flex gap-2">
           <button
             onClick={() => setFilterStatus('all')}
-            className={filterStatus === 'all' ? 'bg-black text-white' : ''}
+            style={(filterStatus !== 'all') ? {} : {'color': 'white', 'background-color': 'black'}}
           >
             All
           </button>
           <button
             onClick={() => setFilterStatus('pending')}
-            className={filterStatus === 'pending' ? 'bg-black text-white' : ''}
+            style={(filterStatus !== 'pending') ? {} : {'color': 'white', 'background-color': 'black'}}
           >
             Pending
           </button>
           <button
             onClick={() => setFilterStatus('active')}
-            className={filterStatus === 'active' ? 'bg-black text-white' : ''}
+            style={(filterStatus !== 'active') ? {} : {'color': 'white', 'background-color': 'black'}}
           >
             Active
           </button>
           <button
             onClick={() => setFilterStatus('closed')}
-            className={filterStatus === 'closed' ? 'bg-black text-white' : ''}
+            style={(filterStatus !== 'closed') ? {} : {'color': 'white', 'background-color': 'black'}}
           >
             Closed
           </button>
@@ -77,17 +78,17 @@ export default function BrowseFunds() {
 
       {/* Funds Grid */}
       <div>
-        {isLoading ? (
+        {(isFundsPending || isFundsLoading) ? (
           <div className="text-center py-12 text-gray-500">Loading funds...</div>
-        ) : filteredFunds.length === 0 ? (
+        ) : (filteredFunds.length === 0) ? (
           <Card>
             <div className="text-center py-12">
               <p className="text-gray-500 mb-4">
-                {searchQuery || filterStatus !== 'all'
+                {(!!searchQuery || filterStatus !== 'all')
                   ? 'No funds match your search criteria'
                   : 'No funds available yet'}
               </p>
-              {(searchQuery || filterStatus !== 'all') && (
+              {(!!searchQuery || filterStatus !== 'all') && (
                 <button
                   onClick={() => {
                     setSearchQuery('');
@@ -102,8 +103,8 @@ export default function BrowseFunds() {
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredFunds.map((fundAddress) => (
-              <FundCard2 key={fundAddress} address={fundAddress} />
+            {filteredFunds.map((fund) => (
+              <FundCard3 key={fund.address} {...fund} />
             ))}
           </div>
         )}
