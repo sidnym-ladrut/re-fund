@@ -5,7 +5,7 @@ import ContextProvider from '@/comp/ContextProvider'
 import { Navigation } from '@/comp/Navigation'
 
 export const metadata: Metadata = {
-  title: "re-fund - Decentralized Crowdfunding",
+  title: "re-fund | home of decentralized crowdfunding",
   description: "A simple crowdfunding platform built on Ethereum where builders can propose work, funders can finance this work, and oracles can evaluate and authorize payment.",
 };
 

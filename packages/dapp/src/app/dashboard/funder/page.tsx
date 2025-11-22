@@ -1,146 +1,24 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAppKitAccount } from "@reown/appkit/react";
 import { ConnectButton } from "@/comp/ConnectButton";
-import { FundCard } from "@/comp/FundCard";
+import { FundCard2 } from "@/comp/FundCard";
 import { Card } from "@/comp/Card";
-import { parseStatus } from "@/lib/util";
 import { FundStatus } from "@/type";
-import Contracts from '@/../chain/contracts';
-
-interface Fund {
-  address: `0x${string}`;
-  worker: `0x${string}`;
-  oracle: `0x${string}`;
-  token: `0x${string}`;
-  status: FundStatus;
-  fundsAvailable: string;
-  tokenSymbol: string;
-}
+import { useAllFunds } from "@/hook/useFundData";
 
 export default function BrowseFunds() {
   const router = useRouter();
-  const { isConnected, caipAddress } = useAppKitAccount();
-  const [funds, setFunds] = useState<Fund[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const { isConnected } = useAppKitAccount();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | FundStatus>('all');
 
-  const ChainContracts = useMemo(() => {
-    if (!isConnected || !caipAddress) return undefined;
-    const chainId = caipAddress.split(':')?.[1];
-    return chainId ? Contracts[chainId as unknown as keyof typeof Contracts] : undefined;
-  }, [isConnected, caipAddress]);
+  const { data: allFundAddresses, isLoading, isPending } = useAllFunds();
 
-  useEffect(() => {
-    if (ChainContracts) {
-      loadAllFunds();
-    }
-  }, [ChainContracts]);
-
-  const loadAllFunds = async () => {
-    if (!ChainContracts || !caipAddress) return;
-
-    setIsLoading(true);
-    try {
-      // Import required functions
-      const { readContract } = await import('wagmi/actions');
-      const { formatUnits } = await import('viem');
-      const { APPKIT_WAGMI } = await import("@/cfg");
-
-      // Extract wallet address from CAIP address (format: "eip155:31337:0x...")
-      const walletAddress = caipAddress.split(':')[2] as `0x${string}`;
-      if (!walletAddress) {
-        setFunds([]);
-        setIsLoading(false);
-        return;
-      }
-
-      // Get all funds from FundFactory
-      const allFunds = await readContract(APPKIT_WAGMI.wagmiConfig, {
-        address: ChainContracts.FundFactory.address,
-        abi: ChainContracts.FundFactory.abi,
-        functionName: 'instances',
-        args: [], // Get all funds (no role filter)
-      }) as `0x${string}`[];
-
-      console.log('All funds for browse:', allFunds);
-
-      // Load details for each fund
-      const fundDetails = await Promise.all(
-        allFunds.map(async (fundAddress) => {
-          try {
-            const [worker, oracle, token, status, fundsAvailable] = await Promise.all([
-              readContract(APPKIT_WAGMI.wagmiConfig, {
-                address: fundAddress,
-                abi: ChainContracts.Fund.abi,
-                functionName: 'worker',
-                args: [],
-              }) as Promise<`0x${string}`>,
-              readContract(APPKIT_WAGMI.wagmiConfig, {
-                address: fundAddress,
-                abi: ChainContracts.Fund.abi,
-                functionName: 'oracle',
-                args: [],
-              }) as Promise<`0x${string}`>,
-              readContract(APPKIT_WAGMI.wagmiConfig, {
-                address: fundAddress,
-                abi: ChainContracts.Fund.abi,
-                functionName: 'payoutToken',
-                args: [],
-              }) as Promise<`0x${string}`>,
-              readContract(APPKIT_WAGMI.wagmiConfig, {
-                address: fundAddress,
-                abi: ChainContracts.Fund.abi,
-                functionName: 'status',
-                args: [],
-              }) as Promise<bigint>,
-              readContract(APPKIT_WAGMI.wagmiConfig, {
-                address: fundAddress,
-                abi: ChainContracts.Fund.abi,
-                functionName: 'fundsAvailable',
-                args: [],
-              }) as Promise<bigint>,
-            ]);
-
-            return {
-              address: fundAddress,
-              worker,
-              oracle,
-              token,
-              fundsAvailable: formatUnits(fundsAvailable, 18),
-              status: parseStatus(status),
-              tokenSymbol: 'FTK', // Default symbol, could be fetched from token contract
-            };
-          } catch (error) {
-            console.error(`Error loading fund details for ${fundAddress}:`, error);
-            return null;
-          }
-        })
-      );
-
-      const validFunds = fundDetails.filter((fund): fund is Fund => fund !== null);
-      setFunds(validFunds);
-
-      console.log('Browse funds loaded:', validFunds);
-    } catch (error) {
-      console.error('Error loading funds:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const filteredFunds = funds.filter((fund) => {
-    const matchesSearch =
-      fund.address.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      fund.worker.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesFilter =
-      filterStatus === 'all' ||
-      (filterStatus === fund.status);
-
-    return matchesSearch && matchesFilter;
+  const filteredFunds = (allFundAddresses || []).filter((fundAddress) => {
+    if (!searchQuery) return true;
+    return fundAddress.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   if (!isConnected) {
@@ -224,8 +102,8 @@ export default function BrowseFunds() {
           </Card>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredFunds.map((fund) => (
-              <FundCard key={fund.address} {...fund} />
+            {filteredFunds.map((fundAddress) => (
+              <FundCard2 key={fundAddress} address={fundAddress} />
             ))}
           </div>
         )}

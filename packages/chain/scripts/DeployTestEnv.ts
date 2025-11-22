@@ -3,7 +3,7 @@ import { getAddress, encodeAbiParameters, parseAbiParameters, keccak256 } from "
 import FundFactory from "../ignition/modules/FundFactory.ts";
 import FundToken from "../ignition/modules/FundToken.ts";
 
-const FUND_TERMS: string = "bafkreigjokjc775uq75cv4n4wjsy4uofgwb3c7mi7epkpci2x6b26f3is4";
+const FUND_TERMS: string = "bafkreie7525ywkhwglluidqr3ule3jsd22bfyfs7yx6jgtlc3v34enosji";
 const FUND_TOKEN_DRIP: bigint = 1000000n;
 
 async function main() {
