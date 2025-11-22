@@ -139,7 +139,7 @@ function FundListItem({
         <Address address={fund.worker} short className="text-xs" />
       </div>
       <div className="col-span-1 text-right font-medium text-green-600 whitespace-nowrap">
-        ${remaining === BigInt(0) ? '0' : formatNumber(formatUnits(remaining, Number(fund.tokenData.decimals)))}
+        {remaining === BigInt(0) ? '0' : formatNumber(formatUnits(remaining, Number(fund.tokenData.decimals)))} {fund.tokenData.symbol ?? "tokens"}
       </div>
       <div className="col-span-1 text-right font-medium whitespace-nowrap">
         {uniqueFunders}
