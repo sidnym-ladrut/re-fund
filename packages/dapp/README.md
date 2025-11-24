@@ -11,8 +11,11 @@ This is a Next.js project.
 4. Sign up for [Pinata](https://pinata.cloud) and copy your gateway url to
    `NEXT_PUBLIC_GATEWAY_URL` and your JWT key to `NEXT_PUBLIC_PINATA_JWT` (be
    sure to generate an admin key!).
-4. Run `npm install` to install dependencies
-5. Run `npm run dev` to start the development server
+5. Sign up for [Infura](https://infura.io) and create an RPC endpoint to use
+   on Ethereum and Sepolia, copying the URLs to `NEXT_PUBLIC_MAINNET_RPC` and
+   `NEXT_PUBLIC_SEPOLIA_RPC`, respectively.
+6. Run `npm install` to install dependencies
+7. Run `npm run dev` to start the development server
 
 ## Resources
 

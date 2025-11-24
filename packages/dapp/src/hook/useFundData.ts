@@ -313,6 +313,7 @@ export function useFundEvents(fundAddress: Address | null) {
       if (!chainContracts || !fundAddress) throw new Error('Missing dependencies');
 
       const publicClient = getPublicClient(APPKIT_WAGMI.wagmiConfig);
+      // const publicClient = ALT_CLIENT;
       if (!publicClient) throw new Error('Public client not available');
 
       // Query all events

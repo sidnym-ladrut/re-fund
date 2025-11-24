@@ -1,6 +1,6 @@
 {
   "name": "@re-fund/chain",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "description": "The on-chain component (Solidity contracts & testing) of the 're-fund' application.",
   "keywords": [],
   "license": "GPL-3.0-or-later",
