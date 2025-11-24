@@ -56,6 +56,90 @@ export function useAllFunds() {
   });
 }
 
+export function useAllFundsFull() {
+  const chainContracts = useChainContracts();
+  const { data: funds, isSuccess: isFundsAvailable } = useAllFunds();
+
+  const { data: fullFunds, isSuccess: isFullFundsAvailable, ...fundsQuery } = useQueries({
+    queries: (funds || [])?.map((fundAddress) => ({
+      queryKey: ['fundStatic', fundAddress],
+      queryFn: async () => {
+        if (!chainContracts || !fundAddress) throw new Error('Missing dependencies');
+        const fundData = await queryFundStaticData({
+          address: fundAddress,
+          contracts: chainContracts,
+        });
+        return fundData;
+      },
+      enabled: !!chainContracts && isFundsAvailable,
+      staleTime: 30000, // Cache for 30 seconds
+    })),
+    combine: (results) => ({
+      data: results.map((result) => result.data),
+      isPending: results.some((result) => result.isPending),
+      isLoading: results.some((result) => (!result.data || result.isLoading)),
+      isSuccess: results.every((result, i) => (!!result.data && result.isSuccess)),
+      isError: results.some((result) => result.isError),
+    }),
+  });
+
+  const { data: fundTerms, ...termsQuery } = useQueries({
+    queries: (fullFunds || [])?.map((fund) => ({
+      queryKey: ['terms', fund?.terms],
+      queryFn: async () => {
+        if (!fund?.terms) throw new Error('Missing dependencies');
+        const termsData = await queryTermsData({ cid: fund.terms });
+        return termsData;
+      },
+      enabled: isFullFundsAvailable,
+      staleTime: 300000, // Cache for 5 minute (static data doesn't change often)
+    })),
+    combine: (results) => ({
+      data: results.map((result) => result.data),
+      errors: results.map((result) => result.error),
+      isPending: results.some((result) => result.isPending),
+      isLoading: results.some((result) => (!result.data || result.isLoading)),
+      isSuccess: results.every((result) => (!!result.data && result.isSuccess)),
+      isError: results.some((result) => result.isError),
+    }),
+  });
+  const { data: fundTokens, ...tokensQuery } = useQueries({
+    queries: (fullFunds || [])?.map((fund) => ({
+      queryKey: ['token', fund?.payoutToken],
+      queryFn: async () => {
+        if (!chainContracts || !fund?.payoutToken) throw new Error('Missing dependencies');
+        const tokenData = await queryTokenData({
+          address: fund.payoutToken,
+          contracts: chainContracts,
+        });
+        return tokenData;
+      },
+      enabled: !!chainContracts && isFullFundsAvailable,
+      staleTime: 300000, // Cache for 5 minute (static data doesn't change often)
+    })),
+    combine: (results) => ({
+      data: results.map((result) => result.data),
+      errors: results.map((result) => result.error),
+      isPending: results.some((result) => result.isPending),
+      isLoading: results.some((result) => (!result.data || result.isLoading)),
+      isSuccess: results.every((result) => (!!result.data && result.isSuccess)),
+      isError: results.some((result) => result.isError),
+    }),
+  });
+
+  return {
+    data: (fullFunds || []).map((f, i) => ({
+      termsData: (fundTerms || [])?.[i],
+      tokenData: (fundTokens || [])?.[i],
+      ...f,
+    })),
+    isPending: [fundsQuery, termsQuery, tokensQuery].some((q) => q.isPending),
+    isLoading: [fundsQuery, termsQuery, tokensQuery].some((q) => q.isLoading),
+    isSuccess: [fundsQuery, termsQuery, tokensQuery].every((q) => q.isSuccess),
+    isError: [fundsQuery, termsQuery, tokensQuery].some((q) => q.isError),
+  };
+}
+
 export function useRoleFunds(address: Address | null, role: FundRole) {
   const chainContracts = useChainContracts();
 

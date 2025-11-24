@@ -48,7 +48,7 @@ export default function WorkerDashboard() {
         <div className="text-center py-12 text-gray-500">Loading funds...</div>
       ) : (
         <>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 gap-6">
             <Card>
               <h4 className="text-gray-500 mb-2">Total Funds</h4>
               <p className="text-3xl font-bold">{funds.length}</p>
@@ -56,10 +56,6 @@ export default function WorkerDashboard() {
             <Card>
               <h4 className="text-gray-500 mb-2">Active Campaigns</h4>
               <p className="text-3xl font-bold">{funds.filter(f => (f.status === 'active')).length}</p>
-            </Card>
-            <Card>
-              <h4 className="text-gray-500 mb-2">Total Raised</h4>
-              <p className="text-3xl font-bold">$0.00</p>
             </Card>
           </div>
           <div>

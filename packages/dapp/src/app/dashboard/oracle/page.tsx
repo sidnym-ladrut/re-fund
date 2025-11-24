@@ -54,7 +54,7 @@ export default function OracleDashboard() {
         <p className="text-gray-600">Review and approve fund campaigns</p>
       </div>
 
-      <div className="grid md:grid-cols-3 gap-6">
+      <div className="grid md:grid-cols-2 gap-6">
         <Card>
           <h4 className="text-gray-500 mb-2">Pending Review</h4>
           <p className="text-3xl font-bold">{pendingFunds.length}</p>
@@ -62,10 +62,6 @@ export default function OracleDashboard() {
         <Card>
           <h4 className="text-gray-500 mb-2">Active Funds</h4>
           <p className="text-3xl font-bold">{activeFunds.length}</p>
-        </Card>
-        <Card>
-          <h4 className="text-gray-500 mb-2">Total Earnings</h4>
-          <p className="text-3xl font-bold">$0.00</p>
         </Card>
       </div>
 

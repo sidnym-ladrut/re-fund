@@ -65,7 +65,7 @@ export default function Home() {
           <div>
             <div className="text-3xl mb-2">1️⃣</div>
             <h3 className="mb-2">Propose</h3>
-            <p className="text-sm text-gray-600">Worker creates a fund with terms, milestones, and oracle</p>
+            <p className="text-sm text-gray-600">Worker creates a fund with terms and oracle</p>
           </div>
           <div>
             <div className="text-3xl mb-2">2️⃣</div>
@@ -90,11 +90,11 @@ export default function Home() {
           <div>
             <div className="text-3xl mb-2">6️⃣</div>
             <h3 className="mb-2">Complete or Refund</h3>
-            <p className="text-sm text-gray-600">Repeat withdrawals for milestones, or refund funders if needed</p>
+            <p className="text-sm text-gray-600">Close out a fund as complete, or refund funders if needed</p>
           </div>
         </div>
         <div className="mt-6 text-center text-sm text-gray-500">
-          <p>✨ All deposits tracked for proportional refunds • Oracle earns a cut on each withdrawal • Cryptographic signatures prevent unauthorized payments</p>
+          <p>All deposits tracked for proportional refunds • Oracle earns a cut on each withdrawal • Cryptographic signatures prevent unauthorized payments</p>
         </div>
       </section>
 
