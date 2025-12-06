@@ -2,14 +2,40 @@
 import { useState } from 'react';
 import Link from 'next/link'
 import { useAppKitAccount } from "@reown/appkit/react";
+import { useReadContracts } from 'wagmi';
 import { ConnectButton } from "@/comp/ConnectButton";
 import { Card } from "@/comp/Card";
 import { Address } from "@/comp/Address";
 import { StatusBadge } from "@/comp/StatusBadge";
-import { useAllFunds, useFundStaticData, useTokenData, useFundEvents, useFundEventWatcher } from "@/hook/useFundData";
+import { useAllFunds, useFundStaticData, useTokenData, useFundEvents, useFundEventWatcher, DepositEvent } from "@/hook/useFundData";
 import { formatUnits } from 'viem';
 import { formatNumber } from '@/lib/util';
 import type { Address as AddressType } from 'viem';
+import { useChainContracts } from '@/hook/wallet';
+
+// Minimal ABI for Chainlink price feed
+const PRICE_FEED_ABI = [
+  {
+    inputs: [],
+    name: 'latestRoundData',
+    outputs: [
+      { name: 'roundId', type: 'uint80' },
+      { name: 'answer', type: 'int256' },
+      { name: 'startedAt', type: 'uint256' },
+      { name: 'updatedAt', type: 'uint256' },
+      { name: 'answeredInRound', type: 'uint80' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ name: '', type: 'uint8' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
 
 export default function FundTracker() {
   const { isConnected } = useAppKitAccount();
@@ -55,9 +81,10 @@ export default function FundTracker() {
             ) : (
               <div>
                 {/* Table Headers */}
-                <div className="hidden sm:grid sm:grid-cols-5 gap-2 px-3 py-2 bg-gray-100 text-xs font-bold text-gray-700">
+                <div className="hidden sm:grid sm:grid-cols-6 gap-2 px-3 py-2 bg-gray-100 text-xs font-bold text-gray-700">
                   <div>Fund</div>
                   <div>Worker</div>
+                  <div>Payout Token</div>
                   <div className="text-right">Remaining</div>
                   <div className="text-right"># Funders</div>
                   <div className="text-right">Status</div>
@@ -124,17 +151,22 @@ function FundListItem({
 
   if (!fundData || !tokenData) return null;
 
-  // Calculate stats from events
+  // Use the contract's on-chain calculated value (handles multi-token + price conversions)
+  const remaining = fundData.fundsAvailable;
+
+  // Count unique funders from events (this is just a count, not affected by decimals)
   const deposits = events?.deposits || [];
-  const withdrawals = events?.withdrawals || [];
-  const refunds = events?.refunds || [];
-
-  const totalDeposited = deposits.reduce((sum, d) => sum + d.amount, BigInt(0));
-  const totalWithdrawn = withdrawals.reduce((sum, w) => sum + w.amount, BigInt(0));
-  const totalRefunded = refunds.reduce((sum, r) => sum + r.amount, BigInt(0));
-  const remaining = totalDeposited - totalWithdrawn - totalRefunded;
-
   const uniqueFunders = new Set(deposits.map(d => d.funder)).size;
+
+  // NOTE: Naive off-chain aggregation - DO NOT USE for multi-token funds!
+  // This breaks when deposits use different tokens with different decimals.
+  // Example: 100 USDC (6 dec) + 100 DAI (18 dec) = wrong sum displayed as $100 trillion
+  // const withdrawals = events?.withdrawals || [];
+  // const refunds = events?.refunds || [];
+  // const totalDeposited = deposits.reduce((sum, d) => sum + d.amount, 0n);
+  // const totalWithdrawn = withdrawals.reduce((sum, w) => sum + w.amount, 0n);
+  // const totalRefunded = refunds.reduce((sum, r) => sum + r.amount, 0n);
+  // const remaining = totalDeposited - totalWithdrawn - totalRefunded;
 
   // Compute background color class
   let bgClass = '';
@@ -149,7 +181,7 @@ function FundListItem({
   return (
     <button
       onClick={onClick}
-      className={`w-full grid grid-cols-2 sm:grid-cols-5 gap-2 px-3 py-2 transition-all text-xs items-center ${bgClass}`}
+      className={`w-full grid grid-cols-2 sm:grid-cols-6 gap-2 px-3 py-2 transition-all text-xs items-center ${bgClass}`}
       style={{ textAlign: 'left', border: 'none', outline: 'none' }}
     >
       <div className="col-span-2 sm:col-span-1 truncate">
@@ -158,8 +190,11 @@ function FundListItem({
       <div className="col-span-2 sm:col-span-1 truncate">
         <Address address={fundData.worker} short className="text-xs" />
       </div>
+      <div className="col-span-1 font-medium whitespace-nowrap">
+        {tokenData.symbol}
+      </div>
       <div className="col-span-1 text-right font-medium text-green-600 whitespace-nowrap">
-        ${remaining === BigInt(0) ? '0' : formatNumber(formatUnits(remaining, Number(tokenData.decimals)))}
+        {remaining === 0n ? '0' : formatNumber(formatUnits(remaining, Number(tokenData.decimals)))}
       </div>
       <div className="col-span-1 text-right font-medium whitespace-nowrap">
         {uniqueFunders}
@@ -168,6 +203,140 @@ function FundListItem({
         <StatusBadge status={fundData.status} />
       </div>
     </button>
+  );
+}
+
+// Component to display a deposit with its original token info
+function DepositItem({ 
+  deposit, 
+  payoutTokenData,
+  fundAddress,
+  payoutToken,
+}: { 
+  deposit: DepositEvent; 
+  payoutTokenData: { symbol: string; decimals: bigint };
+  fundAddress: AddressType;
+  payoutToken: AddressType;
+}) {
+  const { data: depositTokenData } = useTokenData(deposit.token);
+  const chainContracts = useChainContracts();
+
+  const depositDecimals = depositTokenData?.decimals ?? payoutTokenData.decimals;
+  const depositSymbol = depositTokenData?.symbol ?? payoutTokenData.symbol;
+  const isDifferentToken = deposit.token.toLowerCase() !== payoutToken.toLowerCase();
+
+  // Fetch price feeds for both tokens to calculate conversion
+  const { data: priceData } = useReadContracts({
+    contracts: [
+      // Get the feed address for the deposit token
+      {
+        address: fundAddress,
+        abi: chainContracts?.Fund?.abi || [],
+        functionName: 'tokenFeeds',
+        args: [deposit.token],
+      },
+      // Get the feed address for the payout token  
+      {
+        address: fundAddress,
+        abi: chainContracts?.Fund?.abi || [],
+        functionName: 'tokenFeeds',
+        args: [payoutToken],
+      },
+    ],
+    query: {
+      enabled: isDifferentToken && !!chainContracts?.Fund?.abi,
+    },
+  });
+
+  const depositFeedAddress = priceData?.[0]?.result as AddressType | undefined;
+  const payoutFeedAddress = priceData?.[1]?.result as AddressType | undefined;
+
+  // Fetch actual prices from the feeds
+  const { data: feedData } = useReadContracts({
+    contracts: [
+      // Deposit token price
+      {
+        address: depositFeedAddress!,
+        abi: PRICE_FEED_ABI,
+        functionName: 'latestRoundData',
+      },
+      {
+        address: depositFeedAddress!,
+        abi: PRICE_FEED_ABI,
+        functionName: 'decimals',
+      },
+      // Payout token price
+      {
+        address: payoutFeedAddress!,
+        abi: PRICE_FEED_ABI,
+        functionName: 'latestRoundData',
+      },
+      {
+        address: payoutFeedAddress!,
+        abi: PRICE_FEED_ABI,
+        functionName: 'decimals',
+      },
+    ],
+    query: {
+      enabled: isDifferentToken && !!depositFeedAddress && !!payoutFeedAddress,
+    },
+  });
+
+  // Calculate converted value
+  let convertedValue: string | null = null;
+  if (isDifferentToken && feedData) {
+    const depositPriceData = feedData[0]?.result as [bigint, bigint, bigint, bigint, bigint] | undefined;
+    const depositFeedDecimals = feedData[1]?.result as number | undefined;
+    const payoutPriceData = feedData[2]?.result as [bigint, bigint, bigint, bigint, bigint] | undefined;
+    const payoutFeedDecimals = feedData[3]?.result as number | undefined;
+
+    if (depositPriceData && payoutPriceData && depositFeedDecimals !== undefined && payoutFeedDecimals !== undefined) {
+      const depositPrice = depositPriceData[1]; // answer is at index 1
+      const payoutPrice = payoutPriceData[1];
+
+      if (depositPrice > 0n && payoutPrice > 0n) {
+        // Convert: (amount * depositPrice / 10^depositFeedDecimals) / (payoutPrice / 10^payoutFeedDecimals)
+        // Simplified: amount * depositPrice * 10^payoutFeedDecimals / (payoutPrice * 10^depositFeedDecimals)
+        // Also need to adjust for token decimals difference
+        const depositTokenDecimals = Number(depositDecimals);
+        const payoutTokenDecimals = Number(payoutTokenData.decimals);
+        
+        // Value in USD = amount * price / 10^(tokenDecimals + feedDecimals)
+        // Then convert to payout token = valueInUSD * 10^(payoutDecimals + feedDecimals) / payoutPrice
+        const valueInPayout = (deposit.amount * depositPrice * BigInt(10 ** payoutTokenDecimals)) / 
+                              (payoutPrice * BigInt(10 ** depositTokenDecimals));
+        
+        convertedValue = formatNumber(formatUnits(valueInPayout, payoutTokenDecimals));
+      }
+    }
+  }
+
+  return (
+    <div className="p-3 bg-green-50 border border-green-200 rounded-md">
+      <div className="flex justify-between items-start mb-1">
+        <div>
+          <span className="font-medium">
+            {formatNumber(formatUnits(deposit.amount, Number(depositDecimals)))} {depositSymbol}
+          </span>
+          {isDifferentToken && (
+            <span className="text-xs text-gray-500 ml-2">
+              (≈ {convertedValue ?? '...'} {payoutTokenData.symbol})
+            </span>
+          )}
+        </div>
+        {deposit.timestamp && (
+          <span className="text-xs text-gray-500">
+            {new Date(deposit.timestamp * 1000).toLocaleString()}
+          </span>
+        )}
+      </div>
+      <div className="text-sm text-gray-600">
+        From: <Address address={deposit.funder} short />
+      </div>
+      <div className="text-xs text-gray-400 mt-1">
+        Tx: {deposit.transactionHash.slice(0, 10)}...{deposit.transactionHash.slice(-8)}
+      </div>
+    </div>
   );
 }
 
@@ -263,26 +432,13 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
                 <h4 className="font-medium mb-3 text-green-700">💰 Deposits ({events.deposits.length})</h4>
                 <div className="space-y-2">
                   {events.deposits.map((deposit, idx) => (
-                    <div key={`deposit-${idx}`} className="p-3 bg-green-50 border border-green-200 rounded-md">
-                      <div className="flex justify-between items-start mb-1">
-                        <div>
-                          <span className="font-medium">
-                            ${formatNumber(formatUnits(deposit.amount, Number(tokenData.decimals)))}
-                          </span>
-                        </div>
-                        {deposit.timestamp && (
-                          <span className="text-xs text-gray-500">
-                            {new Date(deposit.timestamp * 1000).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        From: <Address address={deposit.funder} short />
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        Tx: {deposit.transactionHash.slice(0, 10)}...{deposit.transactionHash.slice(-8)}
-                      </div>
-                    </div>
+                    <DepositItem 
+                      key={`deposit-${idx}`} 
+                      deposit={deposit} 
+                      payoutTokenData={tokenData}
+                      fundAddress={fundAddress}
+                      payoutToken={fundData.payoutToken}
+                    />
                   ))}
                 </div>
               </div>
@@ -298,7 +454,7 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
                       <div className="flex justify-between items-start mb-1">
                         <div>
                           <span className="font-medium">
-                            ${formatNumber(formatUnits(withdrawal.amount, Number(tokenData.decimals)))}
+                            {formatNumber(formatUnits(withdrawal.amount, Number(tokenData.decimals)))} {tokenData.symbol}
                           </span>
                         </div>
                         {withdrawal.timestamp && (
@@ -326,7 +482,7 @@ function FundDetailView({ fundAddress }: { fundAddress: AddressType }) {
                       <div className="flex justify-between items-start mb-1">
                         <div>
                           <span className="font-medium">
-                            ${formatNumber(formatUnits(refund.amount, Number(tokenData.decimals)))}
+                            {formatNumber(formatUnits(refund.amount, Number(tokenData.decimals)))} {tokenData.symbol}
                           </span>
                         </div>
                         {refund.timestamp && (

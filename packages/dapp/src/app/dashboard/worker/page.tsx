@@ -5,6 +5,7 @@ import { useAppKitAccount, useAppKitProvider } from "@reown/appkit/react";
 import type { Provider } from "@reown/appkit/react";
 import { readContract, writeContract, waitForTransactionReceipt, simulateContract } from 'wagmi/actions';
 import { formatUnits, encodeAbiParameters, parseAbiParameters, keccak256, toHex } from 'viem';
+import type { Address } from 'viem';
 import { ConnectButton } from "@/comp/ConnectButton";
 import { Card } from "@/comp/Card";
 import { FundCard3 } from "@/comp/FundCard";
@@ -19,10 +20,34 @@ import { useChainContracts } from "@/hook/wallet";
 import { APPKIT_WAGMI } from "@/cfg";
 import Contracts from '@/../chain/contracts';
 
+// Aggregate funds by token symbol
+function aggregateFundsByToken(funds: any[]) {
+  const byToken: Record<string, { symbol: string; amount: bigint; decimals: number }> = {};
+  
+  for (const fund of funds) {
+    if (!fund?.tokenData?.symbol || fund.fundsAvailable === undefined) continue;
+    
+    const symbol = fund.tokenData.symbol;
+    if (!byToken[symbol]) {
+      byToken[symbol] = {
+        symbol,
+        amount: 0n,
+        decimals: fund.tokenData.decimals || 18,
+      };
+    }
+    byToken[symbol].amount += fund.fundsAvailable;
+  }
+  
+  return Object.values(byToken);
+}
+
 export default function WorkerDashboard() {
   const { address: walletAddress, isConnected, caipAddress } = useAppKitAccount();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const { data: funds, isPending: isFundsPending, isLoading: isFundsLoading } = useRoleFundsFull(walletAddress, 'worker');
+  
+  // Compute aggregated totals by token
+  const totalsByToken = useMemo(() => aggregateFundsByToken(funds || []), [funds]);
 
   return (!isConnected) ? (
     <div className="text-center py-12">
@@ -59,7 +84,17 @@ export default function WorkerDashboard() {
             </Card>
             <Card>
               <h4 className="text-gray-500 mb-2">Total Raised</h4>
-              <p className="text-3xl font-bold">$0.00</p>
+              {totalsByToken.length === 0 ? (
+                <p className="text-3xl font-bold">0</p>
+              ) : (
+                <div className="space-y-1">
+                  {totalsByToken.map(({ symbol, amount, decimals }) => (
+                    <p key={symbol} className="text-2xl font-bold">
+                      {formatNumber(parseFloat(formatUnits(amount, decimals)))} {symbol}
+                    </p>
+                  ))}
+                </div>
+              )}
             </Card>
           </div>
           <div>
@@ -107,6 +142,7 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
     oracle: '',
     oracleCut: '',
     token: '',
+    tokenType: '', // Tracks dropdown selection: 'fundtoken', 'usdc', 'usdt', 'custom', or ''
     title: '',
     terms: '',
   });
@@ -265,33 +301,55 @@ function CreateFundForm({ onSuccess }: { onSuccess: () => void }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Payout Token Address</label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={formData.token}
-            onChange={(e) => setFormData({ ...formData, token: e.target.value })}
-            placeholder="0x... (e.g., USDC address)"
-            className="flex-1 px-4 py-2 border-2 border-gray-300 rounded-md focus:border-black outline-none"
-            required
-            disabled={isSubmitting}
-          />
+        <label className="block text-sm font-medium mb-2">Payout Token</label>
+        <select
+          value={formData.tokenType}
+          onChange={(e) => {
+            const type = e.target.value;
+            let tokenAddress = '';
+            if (type === 'fundtoken' && chainContracts?.FundToken) {
+              tokenAddress = chainContracts.FundToken.address;
+            } else if (type === 'usdc' && chainContracts?.TestUSDC) {
+              tokenAddress = chainContracts.TestUSDC.address;
+            } else if (type === 'usdt' && chainContracts?.TestUSDT) {
+              tokenAddress = chainContracts.TestUSDT.address;
+            } else if (type === 'custom') {
+              tokenAddress = ''; // Clear for manual input
+            }
+            setFormData({ ...formData, tokenType: type, token: tokenAddress });
+          }}
+          className="w-full px-4 py-2 border-2 border-gray-300 rounded-md focus:border-black outline-none bg-white"
+          disabled={isSubmitting}
+        >
+          <option value="">Select a token...</option>
           {chainContracts?.FundToken && (
-            <button
-              type="button"
-              onClick={() => setFormData({ ...formData, token: chainContracts.FundToken.address })}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 whitespace-nowrap text-sm"
-              disabled={isSubmitting}
-            >
-              Use FundToken
-            </button>
+            <option value="fundtoken">
+              ⚡ FundToken (ERC20Permit, 18 decimals)
+            </option>
           )}
-        </div>
+          {chainContracts?.TestUSDC && (
+            <option value="usdc">
+              ⚡ USDC (ERC20Permit, 6 decimals)
+            </option>
+          )}
+          {chainContracts?.TestUSDT && (
+            <option value="usdt">
+              USDT (Standard ERC20, 6 decimals)
+            </option>
+          )}
+          <option value="custom">Custom token address...</option>
+        </select>
+        <input
+          type="text"
+          value={formData.token}
+          onChange={(e) => setFormData({ ...formData, token: e.target.value })}
+          placeholder="0x... (token address)"
+          className="w-full mt-2 px-4 py-2 border-2 border-gray-300 rounded-md focus:border-black outline-none font-mono text-sm"
+          required
+          disabled={isSubmitting}
+        />
         <p className="text-sm text-gray-500 mt-1">
-          ERC20 token address for payouts (must support ERC20Permit)
-          {chainContracts?.FundToken && (
-            <span className="block mt-0.5">FundToken: {chainContracts.FundToken.address}</span>
-          )}
+          ⚡ = Supports gasless permit deposits
         </p>
       </div>
 

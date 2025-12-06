@@ -27,6 +27,9 @@ abstract contract FundBaseTest is Test {
   uint256 public constant DEPO_AMOUNT = 1e1 * 10 ** FUND_TOKEN_DECIMALS;
   uint256 public constant DEPO_CUT = 1e0 * 10 ** FUND_TOKEN_DECIMALS;
 
+  /// @notice Mock Uniswap V3 SwapRouter address for testing
+  address public constant MOCK_SWAP_ROUTER = address(0x1234567890123456789012345678901234567890);
+
   /////////////////////
   // State Variables //
   /////////////////////
@@ -63,7 +66,7 @@ abstract contract FundBaseTest is Test {
     }
 
     vm.prank(_launcher);
-    _fundImplementation = new Fund();
+    _fundImplementation = new Fund(MOCK_SWAP_ROUTER);
 
     vm.prank(_launcher);
     _fundFactory = new FundFactory(_fundImplementation);

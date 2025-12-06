@@ -8,8 +8,13 @@ export function trimAddress(address: string): string {
   return `${address.slice(0, 5)}…${address.slice(-4)}`;
 }
 
-export function formatNumber(x: string): string {
-  return x.toString().replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
+export function formatNumber(x: string | number, decimals: number = 2): string {
+  // Parse and round to specified decimal places
+  const num = typeof x === 'number' ? x : parseFloat(x);
+  if (isNaN(num)) return String(x);
+  const rounded = num.toFixed(decimals);
+  // Add thousand separators
+  return rounded.replace(/\B(?<!\.\d*)(?=(\d{3})+(?!\d))/g, ",");
 }
 
 export function isObject(v: any): boolean {

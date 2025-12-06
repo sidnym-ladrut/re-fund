@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title IFund
 /// @notice Interface for Fund contracts
@@ -31,7 +32,7 @@ interface IFund {
   ////////////
 
   /// @notice Notification for when tokens are deposited into the fund
-  event Deposit(ERC20Permit indexed token, address indexed from, uint256 amount);
+  event Deposit(IERC20 indexed token, address indexed from, uint256 amount);
   /// @notice Notification for when tokens are withdrawn from the fund
   event Withdrawal(uint256 amount);
   /// @notice Notification for when a refund is issued
@@ -50,4 +51,17 @@ interface IFund {
   /// @notice The oracle assessing the tasks to be performed by the worker
   /// @dev This value can be the same as {worker} for a self-assessed contract
   function oracle() external returns (address);
+
+  /// @notice Deposits tokens using standard approve/transferFrom pattern (for non-permit tokens like USDT)
+  /// @param token The ERC20 token to be deposited
+  /// @param amount The amount to deposit (must have prior approval)
+  function deposit(IERC20 token, uint256 amount) external;
+
+  /// @notice Deposits tokens using ERC20Permit gasless approval (for permit-compatible tokens)
+  /// @param token The ERC20Permit token to be deposited
+  /// @param funder The address of the account that will be depositing
+  /// @param amount The amount of the given token that will deposited
+  /// @param deadline The last permitted block time for the signed deposit
+  /// @param funderSignature An ERC20Permit signature from {funder} authorizing the transfer
+  function deposit(ERC20Permit token, address funder, uint256 amount, uint256 deadline, bytes memory funderSignature) external;
 }

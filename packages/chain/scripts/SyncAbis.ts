@@ -1,5 +1,4 @@
 import * as fs from "fs";
-import { DeployFunction } from "hardhat-deploy/types";
 
 const DEPLOYMENTS_DIR = "./ignition/deployments";
 const ARTIFACTS_DIR = "./artifacts";
